@@ -1,1 +1,1 @@
-<img width="1247" height="810" alt="Screenshot 2026-04-12 173441" src="https://github.com/user-attachments/assets/2607aab2-47c0-4ff2-b070-deb27875eda0" />
+<img width="1058" height="887" alt="3 Mobile Video   Photo Mockups gradient Facebook Post" src="https://github.com/user-attachments/assets/8ef8cf0b-67f1-42b8-ba27-f6a9a389533c" />
