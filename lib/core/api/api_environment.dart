@@ -1,0 +1,3 @@
+enum ApiDomain {
+  gold
+}
