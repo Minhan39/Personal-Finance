@@ -84,6 +84,21 @@ class Expense {
     );
   }
 
+  factory Expense.fromSupabase(Map<String, dynamic> row) {
+    final parsedDate = DateTime.parse(row['date']);
+
+    return Expense(
+      id: row['firebase_id'] ?? row['id'],
+      userId: row['user_id'],
+      category: row['category'],
+      amount: (row['amount'] as num).toDouble(),
+      description: row['description'] ?? '',
+      date: parsedDate,
+      month: parsedDate.month,
+      year: parsedDate.year,
+    );
+  }
+
   @override
   String toString() {
     return 'Expense{id: $id, category: $category, amount: $amount, description: $description, date: $date}';
@@ -141,13 +156,17 @@ enum ExpenseCategory {
     's\u1eeda xe',
   ]),
   family('Family', 'H\u1ed7 tr\u1ee3 gia \u0111\u00ecnh', ['g\u1eedi m\u1eb9']),
-  social('Social', 'Qu\u00e0 c\u00e1p, hi\u1ebfu h\u1ef7, giao l\u01b0u, l\u00ec x\u00ec', [
-    'sinh nh\u1eadt',
-    'l\u00ec x\u00ec',
-    'qu\u00e0 t\u1eb7ng',
-    'm\u1eebng',
-    '\u1ee7ng h\u1ed9',
-  ]),
+  social(
+    'Social',
+    'Qu\u00e0 c\u00e1p, hi\u1ebfu h\u1ef7, giao l\u01b0u, l\u00ec x\u00ec',
+    [
+      'sinh nh\u1eadt',
+      'l\u00ec x\u00ec',
+      'qu\u00e0 t\u1eb7ng',
+      'm\u1eebng',
+      '\u1ee7ng h\u1ed9',
+    ],
+  ),
   personal('Personal', 'Gi\u1ea3i tr\u00ed, c\u00e1 nh\u00e2n', [
     'c\u1eaft t\u00f3c',
     '\u0111i net',

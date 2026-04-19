@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 class IncomeModel {
   final String id;
+  final String userId;
   final IncomeType type;
   final double amount;
   final String note;
@@ -22,6 +23,7 @@ class IncomeModel {
     required this.year,
     this.createdAt,
     this.updatedAt,
+    required this.userId,
   });
 
   factory IncomeModel.fromJson(Map<String, dynamic> json) {
@@ -35,6 +37,7 @@ class IncomeModel {
       year: json['year'] ?? DateTime.now().year,
       createdAt: _dateTimeFromJson(json['createdAt']),
       updatedAt: _dateTimeFromJson(json['updatedAt']),
+      userId: json['id'] ?? '',
     );
   }
 
@@ -54,6 +57,7 @@ class IncomeModel {
 
   IncomeModel copyWith({
     String? id,
+    String? userId,
     IncomeType? type,
     double? amount,
     String? note,
@@ -65,6 +69,7 @@ class IncomeModel {
   }) {
     return IncomeModel(
       id: id ?? this.id,
+      userId: userId ?? this.userId,
       type: type ?? this.type,
       amount: amount ?? this.amount,
       note: note ?? this.note,
@@ -73,6 +78,20 @@ class IncomeModel {
       year: year ?? this.year,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  factory IncomeModel.fromSupabase(Map<String, dynamic> row) {
+    final parsedDate = DateTime.parse(row['date']);
+    return IncomeModel(
+      id: row['firebase_id'] ?? row['id'],
+      userId: row['user_id'],
+      type: IncomeType.fromValue(row['type']),
+      amount: (row['amount'] as num).toDouble(),
+      note: row['note'] ?? '',
+      date: parsedDate,
+      month: parsedDate.month,
+      year: parsedDate.year,
     );
   }
 
@@ -140,9 +159,7 @@ enum IncomeType {
 
 extension IncomeTypeX on List<IncomeModel> {
   Map<IncomeType, double> totalByType() {
-    final totals = {
-      for (final type in IncomeType.values) type: 0.0,
-    };
+    final totals = {for (final type in IncomeType.values) type: 0.0};
 
     for (final income in this) {
       totals[income.type] = (totals[income.type] ?? 0) + income.amount;
@@ -152,6 +169,9 @@ extension IncomeTypeX on List<IncomeModel> {
   }
 
   double grandTotal() {
-    return fold<double>(0, (currentTotal, income) => currentTotal + income.amount);
+    return fold<double>(
+      0,
+      (currentTotal, income) => currentTotal + income.amount,
+    );
   }
 }

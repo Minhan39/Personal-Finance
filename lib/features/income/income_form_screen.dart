@@ -177,6 +177,7 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
       year: _selectedDate.year,
       createdAt: widget.income?.createdAt,
       updatedAt: DateTime.now(),
+      userId: '',
     );
 
     if (_isEditing) {

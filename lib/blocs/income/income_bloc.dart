@@ -3,13 +3,13 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../models/income_model.dart';
-import '../../service/income_repository.dart';
+import '../../service/income_service.dart';
 import 'income_event.dart';
 import 'income_state.dart';
 
 class IncomeBloc extends Bloc<IncomeEvent, IncomeState> {
-  IncomeBloc({required IncomeRepository incomeRepository})
-    : _incomeRepository = incomeRepository,
+  IncomeBloc({required IncomeService incomeService})
+    : _incomeService = incomeService,
       _selectedMonth = DateTime.now().month,
       _selectedYear = DateTime.now().year,
       super(IncomeInitial()) {
@@ -26,7 +26,7 @@ class IncomeBloc extends Bloc<IncomeEvent, IncomeState> {
     add(IncomeMonthChanged(_selectedMonth, _selectedYear));
   }
 
-  final IncomeRepository _incomeRepository;
+  final IncomeService _incomeService;
 
   StreamSubscription<List<IncomeModel>>? _monthSubscription;
   StreamSubscription<List<IncomeModel>>? _yearSubscription;
@@ -40,7 +40,7 @@ class IncomeBloc extends Bloc<IncomeEvent, IncomeState> {
     Emitter<IncomeState> emit,
   ) async {
     await _monthSubscription?.cancel();
-    _monthSubscription = _incomeRepository
+    _monthSubscription = _incomeService
         .watchByMonth(event.month, event.year)
         .listen(
           (incomes) => add(IncomeMonthDataChanged(incomes)),
@@ -57,7 +57,7 @@ class IncomeBloc extends Bloc<IncomeEvent, IncomeState> {
     Emitter<IncomeState> emit,
   ) async {
     await _yearSubscription?.cancel();
-    _yearSubscription = _incomeRepository
+    _yearSubscription = _incomeService
         .watchByYear(event.year)
         .listen(
           (incomes) => add(IncomeYearDataChanged(incomes)),
@@ -74,7 +74,7 @@ class IncomeBloc extends Bloc<IncomeEvent, IncomeState> {
     Emitter<IncomeState> emit,
   ) async {
     try {
-      await _incomeRepository.addIncome(event.income);
+      await _incomeService.addIncome(event.income);
     } catch (error) {
       emit(IncomeError('Không thể thêm thu nhập: $error'));
       _emitLoadedState(emit);
@@ -86,7 +86,7 @@ class IncomeBloc extends Bloc<IncomeEvent, IncomeState> {
     Emitter<IncomeState> emit,
   ) async {
     try {
-      await _incomeRepository.updateIncome(event.income);
+      await _incomeService.updateIncome(event.income);
     } catch (error) {
       emit(IncomeError('Không thể cập nhật thu nhập: $error'));
       _emitLoadedState(emit);
@@ -98,7 +98,7 @@ class IncomeBloc extends Bloc<IncomeEvent, IncomeState> {
     Emitter<IncomeState> emit,
   ) async {
     try {
-      await _incomeRepository.deleteIncome(event.id);
+      await _incomeService.deleteIncome(event.id);
     } catch (error) {
       emit(IncomeError('Không thể xoá thu nhập: $error'));
       _emitLoadedState(emit);

@@ -7,7 +7,8 @@ import 'package:personal_finance/blocs/theme/theme_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:personal_finance/features/auth/login_screen.dart';
 import 'package:personal_finance/features/home/home_screen.dart';
-import 'package:personal_finance/service/income_repository.dart';
+import 'package:personal_finance/service/income_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'blocs/expense/expense_bloc.dart';
 import 'blocs/income/income_bloc.dart';
 import 'blocs/theme/theme_state.dart';
@@ -18,7 +19,12 @@ void main() async {
   await Firebase.initializeApp();
   await GoogleSignIn.instance.initialize(
     serverClientId:
-        '822917060497-1kf4cpbpun4s2gjvi9odhb1vfjlg9rqj.apps.googleusercontent.com',
+        'your_id',
+  );
+
+  await Supabase.initialize(
+    url: 'https://fmimpmegzytqaztnzsqh.supabase.co',
+    anonKey: 'your_key',
   );
 
   FirebaseMessaging messaging = FirebaseMessaging.instance;
@@ -53,8 +59,7 @@ void main() async {
         BlocProvider(create: (_) => ThemeBloc()),
         BlocProvider(create: (context) => ExpenseBloc()),
         BlocProvider(
-          create: (context) =>
-              IncomeBloc(incomeRepository: IncomeRepository()),
+          create: (context) => IncomeBloc(incomeService: IncomeService()),
         ),
       ],
       child: MyApp(),
