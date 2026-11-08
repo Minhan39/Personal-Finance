@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:personal_finance/features/income/income_dashboard_screen.dart';
 import 'package:personal_finance/features/income/income_form_screen.dart';
 import 'package:personal_finance/features/income/income_list_screen.dart';
@@ -6,12 +6,14 @@ import 'package:personal_finance/features/spending/spending_screen.dart';
 import 'package:personal_finance/models/income_model.dart';
 
 import '../features/auth/login_screen.dart';
+import '../features/ai_report/financial_ai_report_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/save/save_screen.dart';
 
 final routes = {
   '/home': (context) => const HomeScreen(),
   '/save': (context) => const SaveScreen(),
+  '/ai-report': (context) => const FinancialAiReportScreen(),
   '/login': (context) => const LoginScreen(),
   '/spending': (context) => const SpendingScreen(),
   '/income': (context) => const IncomeDashboardScreen(),

@@ -17,22 +17,26 @@ class SupabaseExpenseService {
   }) async {
     try {
       final effectiveDate = date ?? DateTime.now();
-      final res = await _client
-          .from('expenses')
-          .insert({
-            'firebase_id': firebaseId,
-            'user_id': userId,
-            'category': category,
-            'amount': amount,
-            'description': description,
-            'date': effectiveDate.toIso8601String(),
-            'month': effectiveDate.month,
-            'year': effectiveDate.year,
-          })
-          .select('id')
-          .single();
+      final payload = {
+        'firebase_id': firebaseId,
+        'user_id': userId,
+        'category': category,
+        'amount': amount,
+        'description': description,
+        'date': effectiveDate.toIso8601String(),
+        'month': effectiveDate.month,
+        'year': effectiveDate.year,
+      };
 
-      return res['id'] as String?;
+      final request = firebaseId == null
+          ? _client.from('expenses').insert(payload)
+          : _client.from('expenses').upsert(
+              payload,
+              onConflict: 'firebase_id',
+            );
+
+      await request;
+      return firebaseId ?? '';
     } catch (e) {
       debugPrint('Supabase addExpense error: $e');
       return null;

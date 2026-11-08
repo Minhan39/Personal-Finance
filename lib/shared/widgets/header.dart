@@ -1,5 +1,5 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:personal_finance/service/auth_service.dart';
 
 class Header extends StatelessWidget {
   const Header({super.key, required this.openDrawer});
@@ -7,14 +7,20 @@ class Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = AppAuthService.supabaseSession?.user;
+    final displayName =
+        user?.userMetadata?['full_name']?.toString() ??
+        user?.userMetadata?['name']?.toString() ??
+        user?.email ??
+        '';
+    final avatarUrl = user?.userMetadata?['avatar_url']?.toString();
 
     return Row(
       children: [
         InkWell(
           onTap: openDrawer,
           child: CircleAvatar(
-            backgroundImage: NetworkImage(user?.photoURL ?? ''),
+            backgroundImage: NetworkImage(avatarUrl ?? ''),
           ),
         ),
         Expanded(
@@ -32,7 +38,7 @@ class Header extends StatelessWidget {
                     children: [
                       TextSpan(text: '👋 Xin chào, '),
                       TextSpan(
-                        text: user?.displayName ?? '',
+                        text: displayName,
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ],

@@ -42,6 +42,12 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       key: _scaffoldKey,
       drawer: const AppDrawer(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => Navigator.pushNamed(context, '/ai-report'),
+        tooltip: 'Báo cáo tài chính',
+        child: const Icon(Icons.assessment),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: FutureBuilder<List<List<Object?>>?>(
         future: _dataFuture,
         builder: (context, snapshot) {
@@ -80,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: SafeArea(
                   top: false,
                   child: ListView.builder(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
                     itemCount: homeFeatureData.length,
                     itemBuilder: (BuildContext context, int index) {
                       var arguments =

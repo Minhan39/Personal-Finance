@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -9,7 +10,7 @@ class SupabaseIncomeService {
 
   Future<String?> addIncome(IncomeModel income, {String? firebaseId}) async {
     try {
-      final res = await _client.from('incomes').insert({
+      final payload = {
         'firebase_id': firebaseId,
         'user_id': income.userId,
         'type': income.type.value,
@@ -17,10 +18,15 @@ class SupabaseIncomeService {
         'note': income.note,
         'date': income.date.toIso8601String(),
         'month': income.date.month,
-        'year': income.date.year,
-      }).select('id').single();
+        'year': income.year,
+      };
 
-      return res['id'] as String?;
+      final request = firebaseId == null
+          ? _client.from('incomes').insert(payload)
+          : _client.from('incomes').upsert(payload, onConflict: 'firebase_id');
+
+      await request;
+      return firebaseId ?? income.id;
     } catch (e) {
       debugPrint('Supabase addIncome error: $e');
       return null;
@@ -29,15 +35,18 @@ class SupabaseIncomeService {
 
   Future<void> updateIncome(IncomeModel income) async {
     try {
-      await _client.from('incomes').update({
-        'type': income.type.value,
-        'amount': income.amount,
-        'note': income.note,
-        'date': income.date.toIso8601String(),
-        'month': income.date.month,
-        'year': income.date.year,
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('firebase_id', income.id);
+      await _client
+          .from('incomes')
+          .update({
+            'type': income.type.value,
+            'amount': income.amount,
+            'note': income.note,
+            'date': income.date.toIso8601String(),
+            'month': income.date.month,
+            'year': income.year,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('firebase_id', income.id);
     } catch (e) {
       debugPrint('Supabase updateIncome error: $e');
     }
@@ -51,12 +60,11 @@ class SupabaseIncomeService {
     }
   }
 
-  Future<List<IncomeModel>> getByMonth(int month, int year, String userId) async {
+  Future<List<IncomeModel>> getByMonth(int month, int year) async {
     try {
       final res = await _client
           .from('incomes')
           .select()
-          .eq('user_id', userId)
           .eq('month', month)
           .eq('year', year)
           .order('date', ascending: false);
@@ -68,12 +76,11 @@ class SupabaseIncomeService {
     }
   }
 
-  Future<List<IncomeModel>> getByYear(int year, String userId) async {
+  Future<List<IncomeModel>> getByYear(int year) async {
     try {
       final res = await _client
           .from('incomes')
           .select()
-          .eq('user_id', userId)
           .eq('year', year)
           .order('date', ascending: false);
 
@@ -84,29 +91,46 @@ class SupabaseIncomeService {
     }
   }
 
-  Stream<List<IncomeModel>> watchByMonth(
-      int month,
-      int year,
-      String userId,
-      ) {
+  Future<List<IncomeModel>> getByRange({
+    required DateTime startMonth,
+    required DateTime endMonth,
+  }) async {
+    try {
+      final normalizedStart = DateTime(startMonth.year, startMonth.month);
+      final normalizedEnd = DateTime(endMonth.year, endMonth.month);
+      final incomes = <IncomeModel>[];
+      var cursor = normalizedStart;
+
+      while (!cursor.isAfter(normalizedEnd)) {
+        final monthly = await getByMonth(cursor.month, cursor.year);
+        incomes.addAll(monthly);
+        cursor = DateTime(cursor.year, cursor.month + 1);
+      }
+
+      incomes.sort((a, b) => a.date.compareTo(b.date));
+      return incomes;
+    } catch (e) {
+      debugPrint('Supabase getByRange error: $e');
+      return [];
+    }
+  }
+
+  Stream<List<IncomeModel>> watchByMonth(int month, int year) {
     return _buildRealtimeStream(
-      channelKey: 'incomes_${userId}_${year}_$month',
-      userId: userId,
-      fetchData: () => getByMonth(month, year, userId),
+      channelKey: 'incomes_${year}_$month',
+      fetchData: () => getByMonth(month, year),
     );
   }
 
-  Stream<List<IncomeModel>> watchByYear(int year, String userId) {
+  Stream<List<IncomeModel>> watchByYear(int year) {
     return _buildRealtimeStream(
-      channelKey: 'incomes_${userId}_$year',
-      userId: userId,
-      fetchData: () => getByYear(year, userId),
+      channelKey: 'incomes_$year',
+      fetchData: () => getByYear(year),
     );
   }
 
   Stream<List<IncomeModel>> _buildRealtimeStream({
     required String channelKey,
-    required String userId,
     required Future<List<IncomeModel>> Function() fetchData,
   }) {
     final controller = StreamController<List<IncomeModel>>.broadcast();
@@ -118,19 +142,14 @@ class SupabaseIncomeService {
     final channel = _client
         .channel(channelKey)
         .onPostgresChanges(
-      event: PostgresChangeEvent.all,
-      schema: 'public',
-      table: 'incomes',
-      filter: PostgresChangeFilter(
-        type: PostgresChangeFilterType.eq,
-        column: 'user_id',
-        value: userId,
-      ),
-      callback: (_) async {
-        final data = await fetchData();
-        if (!controller.isClosed) controller.add(data);
-      },
-    )
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'incomes',
+          callback: (_) async {
+            final data = await fetchData();
+            if (!controller.isClosed) controller.add(data);
+          },
+        )
         .subscribe();
 
     controller.onCancel = () {

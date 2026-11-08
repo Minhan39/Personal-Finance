@@ -1,7 +1,6 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:personal_finance/service/auth_service.dart';
 
 import '../../blocs/theme/theme_bloc.dart';
 import '../../blocs/theme/theme_event.dart';
@@ -11,14 +10,19 @@ class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
 
   Future<void> _signOut() async {
-    await GoogleSignIn.instance.disconnect();
-    await FirebaseAuth.instance.signOut();
+    await AppAuthService.signOut();
   }
 
   @override
   Widget build(BuildContext context) {
     final themeState = context.watch<ThemeBloc>().state;
-    final user = FirebaseAuth.instance.currentUser;
+    final user = AppAuthService.supabaseSession?.user;
+    final avatarUrl = user?.userMetadata?['avatar_url']?.toString();
+    final displayName =
+        user?.userMetadata?['full_name']?.toString() ??
+        user?.userMetadata?['name']?.toString() ??
+        user?.email ??
+        '';
 
     return SafeArea(
       child: Drawer(
@@ -26,9 +30,9 @@ class AppDrawer extends StatelessWidget {
           children: [
             UserAccountsDrawerHeader(
               currentAccountPicture: CircleAvatar(
-                backgroundImage: NetworkImage(user?.photoURL ?? ''),
+                backgroundImage: NetworkImage(avatarUrl ?? ''),
               ),
-              accountName: Text(user?.displayName ?? ''),
+              accountName: Text(displayName),
               accountEmail: Text(user?.email ?? ''),
             ),
             const ListTile(title: Text("Chế độ giao diện")),

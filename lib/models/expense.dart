@@ -28,19 +28,15 @@ class Expense {
   factory Expense.fromMap(Map<String, dynamic> map, {String? id}) {
     return Expense(
       id: id,
-      userId: map['userId'] ?? '',
-      category: map['category'] ?? '',
-      amount: (map['amount'] as num).toDouble(),
-      description: map['description'] ?? '',
-      date: (map['date'] as Timestamp).toDate(),
-      month: map['month'] ?? 1,
-      year: map['year'] ?? DateTime.now().year,
-      createdAt: map['createdAt'] != null
-          ? (map['createdAt'] as Timestamp).toDate()
-          : null,
-      updatedAt: map['updatedAt'] != null
-          ? (map['updatedAt'] as Timestamp).toDate()
-          : null,
+      userId: (map['userId'] ?? map['user_id'] ?? '') as String,
+      category: (map['category'] ?? '') as String,
+      amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
+      description: (map['description'] ?? '') as String,
+      date: _dateFromDynamic(map['date']) ?? DateTime.now(),
+      month: (map['month'] as num?)?.toInt() ?? 1,
+      year: (map['year'] as num?)?.toInt() ?? DateTime.now().year,
+      createdAt: _dateFromDynamic(map['createdAt']),
+      updatedAt: _dateFromDynamic(map['updatedAt']),
     );
   }
 
@@ -85,13 +81,13 @@ class Expense {
   }
 
   factory Expense.fromSupabase(Map<String, dynamic> row) {
-    final parsedDate = DateTime.parse(row['date']);
+    final parsedDate = _dateFromDynamic(row['date']) ?? DateTime.now();
 
     return Expense(
       id: row['firebase_id'] ?? row['id'],
-      userId: row['user_id'],
-      category: row['category'],
-      amount: (row['amount'] as num).toDouble(),
+      userId: row['user_id'] ?? row['userId'] ?? '',
+      category: row['category'] ?? '',
+      amount: (row['amount'] as num?)?.toDouble() ?? 0.0,
       description: row['description'] ?? '',
       date: parsedDate,
       month: parsedDate.month,
@@ -124,6 +120,28 @@ class Expense {
       amount.hashCode ^
       description.hashCode ^
       date.hashCode;
+
+  static DateTime? _dateFromDynamic(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String) {
+      return DateTime.tryParse(value);
+    }
+    if (value is int) {
+      return DateTime.fromMillisecondsSinceEpoch(value);
+    }
+    if (value is Map && value['seconds'] != null) {
+      final seconds = value['seconds'];
+      final nanoseconds = value['nanoseconds'] ?? 0;
+      if (seconds is int) {
+        return DateTime.fromMillisecondsSinceEpoch(
+          seconds * 1000 + (nanoseconds is int ? nanoseconds ~/ 1000000 : 0),
+        );
+      }
+    }
+    return null;
+  }
 }
 
 enum ExpenseCategory {

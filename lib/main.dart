@@ -1,14 +1,15 @@
-﻿import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:personal_finance/blocs/theme/theme_bloc.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:personal_finance/features/auth/login_screen.dart';
 import 'package:personal_finance/features/home/home_screen.dart';
+import 'package:personal_finance/service/auth_service.dart';
 import 'package:personal_finance/service/income_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' hide User;
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'blocs/expense/expense_bloc.dart';
 import 'blocs/income/income_bloc.dart';
 import 'blocs/theme/theme_state.dart';
@@ -17,19 +18,20 @@ import 'navigator/navigator.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  const webClientId =
+      '822917060497-1kf4cpbpun4s2gjvi9odhb1vfjlg9rqj.apps.googleusercontent.com';
   await GoogleSignIn.instance.initialize(
-    serverClientId:
-        'your_id',
+    serverClientId: webClientId,
   );
-
   await Supabase.initialize(
     url: 'https://fmimpmegzytqaztnzsqh.supabase.co',
-    anonKey: 'your_key',
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtaW1wbWVnenl0cWF6dG56c3FoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NDI2NTgsImV4cCI6MjA5MjExODY1OH0.X7wnz-9H0trjbCEujZFuAYJDTpUX35RglJDAMiM5oVo',
   );
 
-  FirebaseMessaging messaging = FirebaseMessaging.instance;
+  final messaging = FirebaseMessaging.instance;
 
-  NotificationSettings settings = await messaging.requestPermission(
+  final settings = await messaging.requestPermission(
     alert: true,
     badge: true,
     sound: true,
@@ -46,9 +48,7 @@ void main() async {
     debugPrint("Opened from notification");
   });
 
-  RemoteMessage? initialMessage = await FirebaseMessaging.instance
-      .getInitialMessage();
-
+  final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
   if (initialMessage != null) {
     debugPrint("Opened app from terminated state");
   }
@@ -62,7 +62,7 @@ void main() async {
           create: (context) => IncomeBloc(incomeService: IncomeService()),
         ),
       ],
-      child: MyApp(),
+      child: const MyApp(),
     ),
   );
 }
@@ -109,14 +109,13 @@ class MyApp extends StatelessWidget {
           ),
           routes: routes,
           onGenerateRoute: onGenerateRoute,
-          home: StreamBuilder<User?>(
-            stream: FirebaseAuth.instance.authStateChanges(),
+          home: StreamBuilder<Session?>(
+            stream: AppAuthService.supabaseSessionChanges(),
             builder: (context, snapshot) {
-              if (snapshot.hasData) {
-                return HomeScreen();
-              } else {
-                return LoginScreen();
+              if (snapshot.hasData && snapshot.data != null) {
+                return const HomeScreen();
               }
+              return const LoginScreen();
             },
           ),
         );

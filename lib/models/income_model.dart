@@ -33,17 +33,18 @@ class IncomeModel {
       amount: (json['amount'] as num?)?.toDouble() ?? 0,
       note: json['note'] ?? '',
       date: _dateTimeFromJson(json['date']) ?? DateTime.now(),
-      month: json['month'] ?? 1,
-      year: json['year'] ?? DateTime.now().year,
+      month: (json['month'] as num?)?.toInt() ?? 1,
+      year: (json['year'] as num?)?.toInt() ?? DateTime.now().year,
       createdAt: _dateTimeFromJson(json['createdAt']),
       updatedAt: _dateTimeFromJson(json['updatedAt']),
-      userId: json['id'] ?? '',
+      userId: json['user_id'] ?? json['userId'] ?? '',
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'user_id': userId,
       'type': type.value,
       'amount': amount,
       'note': note,
@@ -82,12 +83,12 @@ class IncomeModel {
   }
 
   factory IncomeModel.fromSupabase(Map<String, dynamic> row) {
-    final parsedDate = DateTime.parse(row['date']);
+    final parsedDate = _dateTimeFromJson(row['date']) ?? DateTime.now();
     return IncomeModel(
       id: row['firebase_id'] ?? row['id'],
-      userId: row['user_id'],
-      type: IncomeType.fromValue(row['type']),
-      amount: (row['amount'] as num).toDouble(),
+      userId: row['user_id'] ?? row['userId'] ?? '',
+      type: IncomeType.fromValue(row['type'] as String?),
+      amount: (row['amount'] as num?)?.toDouble() ?? 0,
       note: row['note'] ?? '',
       date: parsedDate,
       month: parsedDate.month,
@@ -104,6 +105,21 @@ class IncomeModel {
     }
     if (value is DateTime) {
       return value;
+    }
+    if (value is String) {
+      return DateTime.tryParse(value);
+    }
+    if (value is int) {
+      return DateTime.fromMillisecondsSinceEpoch(value);
+    }
+    if (value is Map && value['seconds'] != null) {
+      final seconds = value['seconds'];
+      final nanoseconds = value['nanoseconds'] ?? 0;
+      if (seconds is int) {
+        return DateTime.fromMillisecondsSinceEpoch(
+          seconds * 1000 + (nanoseconds is int ? nanoseconds ~/ 1000000 : 0),
+        );
+      }
     }
     return null;
   }
