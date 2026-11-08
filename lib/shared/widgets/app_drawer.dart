@@ -30,55 +30,66 @@ class AppDrawer extends StatelessWidget {
           children: [
             UserAccountsDrawerHeader(
               currentAccountPicture: CircleAvatar(
-                backgroundImage: NetworkImage(avatarUrl ?? ''),
+                backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                    ? NetworkImage(avatarUrl)
+                    : null,
+                child: avatarUrl != null && avatarUrl.isNotEmpty
+                    ? null
+                    : const Icon(Icons.person),
               ),
               accountName: Text(displayName),
               accountEmail: Text(user?.email ?? ''),
             ),
             const ListTile(title: Text("Chế độ giao diện")),
-            RadioListTile<ThemeMode>(
-              title: const Text('Hệ thống'),
-              value: ThemeMode.system,
+            RadioGroup<ThemeMode>(
               groupValue: themeState.mode,
-              onChanged: (mode) =>
-                  context.read<ThemeBloc>().add(ChangeThemeMode(mode!)),
-            ),
-            RadioListTile<ThemeMode>(
-              title: const Text('Sáng'),
-              value: ThemeMode.light,
-              groupValue: themeState.mode,
-              onChanged: (mode) =>
-                  context.read<ThemeBloc>().add(ChangeThemeMode(mode!)),
-            ),
-            RadioListTile<ThemeMode>(
-              title: const Text('Tối'),
-              value: ThemeMode.dark,
-              groupValue: themeState.mode,
-              onChanged: (mode) =>
-                  context.read<ThemeBloc>().add(ChangeThemeMode(mode!)),
+              onChanged: (mode) {
+                if (mode != null) {
+                  context.read<ThemeBloc>().add(ChangeThemeMode(mode));
+                }
+              },
+              child: Column(
+                children: [
+                  RadioListTile<ThemeMode>(
+                    title: const Text('Hệ thống'),
+                    value: ThemeMode.system,
+                  ),
+                  RadioListTile<ThemeMode>(
+                    title: const Text('Sáng'),
+                    value: ThemeMode.light,
+                  ),
+                  RadioListTile<ThemeMode>(
+                    title: const Text('Tối'),
+                    value: ThemeMode.dark,
+                  ),
+                ],
+              ),
             ),
             const Divider(),
             const ListTile(title: Text("Chế độ màu sắc")),
-            RadioListTile<AppThemeColor>(
-              title: const Text('Xanh lục'),
-              value: AppThemeColor.green,
+            RadioGroup<AppThemeColor>(
               groupValue: themeState.color,
-              onChanged: (color) =>
-                  context.read<ThemeBloc>().add(ChangeThemeColor(color!)),
-            ),
-            RadioListTile<AppThemeColor>(
-              title: const Text('Xanh dương'),
-              value: AppThemeColor.blue,
-              groupValue: themeState.color,
-              onChanged: (color) =>
-                  context.read<ThemeBloc>().add(ChangeThemeColor(color!)),
-            ),
-            RadioListTile<AppThemeColor>(
-              title: const Text('Tím than'),
-              value: AppThemeColor.purple,
-              groupValue: themeState.color,
-              onChanged: (color) =>
-                  context.read<ThemeBloc>().add(ChangeThemeColor(color!)),
+              onChanged: (color) {
+                if (color != null) {
+                  context.read<ThemeBloc>().add(ChangeThemeColor(color));
+                }
+              },
+              child: Column(
+                children: [
+                  RadioListTile<AppThemeColor>(
+                    title: const Text('Xanh lục'),
+                    value: AppThemeColor.green,
+                  ),
+                  RadioListTile<AppThemeColor>(
+                    title: const Text('Xanh dương'),
+                    value: AppThemeColor.blue,
+                  ),
+                  RadioListTile<AppThemeColor>(
+                    title: const Text('Tím than'),
+                    value: AppThemeColor.purple,
+                  ),
+                ],
+              ),
             ),
             const Divider(),
             ListTile(

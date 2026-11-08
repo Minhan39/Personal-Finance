@@ -50,7 +50,9 @@ class AppAuthService {
         );
         await _firebaseAuth.signInWithCredential(credential);
       } catch (firebaseError) {
-        debugPrint('Firebase sign-in failed but Supabase succeeded: $firebaseError');
+        debugPrint(
+          'Firebase sign-in failed but Supabase succeeded: $firebaseError',
+        );
       }
       return true;
     } catch (e, s) {

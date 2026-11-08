@@ -8,6 +8,16 @@ import '../../models/income_model.dart';
 class SupabaseIncomeService {
   static final _client = Supabase.instance.client;
 
+  /// Reads are scoped to the signed-in user so data never leaks across
+  /// accounts even if RLS is misconfigured. Throws when nobody is signed in.
+  String get _userId {
+    final id = _client.auth.currentUser?.id;
+    if (id == null) {
+      throw StateError('Supabase user is not signed in');
+    }
+    return id;
+  }
+
   Future<String?> addIncome(IncomeModel income, {String? firebaseId}) async {
     try {
       final payload = {
@@ -46,7 +56,8 @@ class SupabaseIncomeService {
             'year': income.year,
             'updated_at': DateTime.now().toIso8601String(),
           })
-          .eq('firebase_id', income.id);
+          .eq('firebase_id', income.id)
+          .eq('user_id', _userId);
     } catch (e) {
       debugPrint('Supabase updateIncome error: $e');
     }
@@ -54,65 +65,57 @@ class SupabaseIncomeService {
 
   Future<void> deleteIncome(String firebaseId) async {
     try {
-      await _client.from('incomes').delete().eq('firebase_id', firebaseId);
+      await _client
+          .from('incomes')
+          .delete()
+          .eq('firebase_id', firebaseId)
+          .eq('user_id', _userId);
     } catch (e) {
       debugPrint('Supabase deleteIncome error: $e');
     }
   }
 
+  // Read methods let errors propagate: the sync layer relies on exceptions
+  // to tell "source unavailable" apart from "source has no rows".
   Future<List<IncomeModel>> getByMonth(int month, int year) async {
-    try {
-      final res = await _client
-          .from('incomes')
-          .select()
-          .eq('month', month)
-          .eq('year', year)
-          .order('date', ascending: false);
+    final res = await _client
+        .from('incomes')
+        .select()
+        .eq('user_id', _userId)
+        .eq('month', month)
+        .eq('year', year)
+        .order('date', ascending: false);
 
-      return (res as List).map((row) => IncomeModel.fromSupabase(row)).toList();
-    } catch (e) {
-      debugPrint('Supabase getByMonth error: $e');
-      return [];
-    }
+    return (res as List).map((row) => IncomeModel.fromSupabase(row)).toList();
   }
 
   Future<List<IncomeModel>> getByYear(int year) async {
-    try {
-      final res = await _client
-          .from('incomes')
-          .select()
-          .eq('year', year)
-          .order('date', ascending: false);
+    final res = await _client
+        .from('incomes')
+        .select()
+        .eq('user_id', _userId)
+        .eq('year', year)
+        .order('date', ascending: false);
 
-      return (res as List).map((row) => IncomeModel.fromSupabase(row)).toList();
-    } catch (e) {
-      debugPrint('Supabase getByYear error: $e');
-      return [];
-    }
+    return (res as List).map((row) => IncomeModel.fromSupabase(row)).toList();
   }
 
   Future<List<IncomeModel>> getByRange({
     required DateTime startMonth,
     required DateTime endMonth,
   }) async {
-    try {
-      final normalizedStart = DateTime(startMonth.year, startMonth.month);
-      final normalizedEnd = DateTime(endMonth.year, endMonth.month);
-      final incomes = <IncomeModel>[];
-      var cursor = normalizedStart;
+    final rangeStart = DateTime(startMonth.year, startMonth.month);
+    final rangeEnd = DateTime(endMonth.year, endMonth.month + 1);
 
-      while (!cursor.isAfter(normalizedEnd)) {
-        final monthly = await getByMonth(cursor.month, cursor.year);
-        incomes.addAll(monthly);
-        cursor = DateTime(cursor.year, cursor.month + 1);
-      }
+    final res = await _client
+        .from('incomes')
+        .select()
+        .eq('user_id', _userId)
+        .gte('date', rangeStart.toIso8601String())
+        .lt('date', rangeEnd.toIso8601String())
+        .order('date', ascending: true);
 
-      incomes.sort((a, b) => a.date.compareTo(b.date));
-      return incomes;
-    } catch (e) {
-      debugPrint('Supabase getByRange error: $e');
-      return [];
-    }
+    return (res as List).map((row) => IncomeModel.fromSupabase(row)).toList();
   }
 
   Stream<List<IncomeModel>> watchByMonth(int month, int year) {
@@ -135,9 +138,16 @@ class SupabaseIncomeService {
   }) {
     final controller = StreamController<List<IncomeModel>>.broadcast();
 
-    fetchData().then((data) {
-      if (!controller.isClosed) controller.add(data);
-    });
+    Future<void> refresh() async {
+      try {
+        final data = await fetchData();
+        if (!controller.isClosed) controller.add(data);
+      } catch (error, stackTrace) {
+        if (!controller.isClosed) controller.addError(error, stackTrace);
+      }
+    }
+
+    refresh();
 
     final channel = _client
         .channel(channelKey)
@@ -145,10 +155,7 @@ class SupabaseIncomeService {
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'incomes',
-          callback: (_) async {
-            final data = await fetchData();
-            if (!controller.isClosed) controller.add(data);
-          },
+          callback: (_) => refresh(),
         )
         .subscribe();
 

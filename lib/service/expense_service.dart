@@ -91,18 +91,16 @@ class ExpenseService {
       if (_canUseFirebase && firebaseUserId != null) {
         try {
           final effectiveDate = date ?? DateTime.now();
-          await _firestore.collection('expenses').doc(docRef.id).set(
-                {
-                  'userId': firebaseUserId,
-                  'category': category,
-                  'amount': amount,
-                  'description': description,
-                  'date': effectiveDate,
-                  'month': effectiveDate.month,
-                  'year': effectiveDate.year,
-                  'createdAt': FieldValue.serverTimestamp(),
-                },
-              );
+          await _firestore.collection('expenses').doc(docRef.id).set({
+            'userId': firebaseUserId,
+            'category': category,
+            'amount': amount,
+            'description': description,
+            'date': effectiveDate,
+            'month': effectiveDate.month,
+            'year': effectiveDate.year,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
           SourceCircuitBreaker.markSuccess(_firebaseKey);
           return true;
         } catch (firebaseError) {
@@ -118,21 +116,11 @@ class ExpenseService {
     required int month,
     required int year,
   }) async {
-    final primaryEnabled = supabaseUserId != null && _canUseSupabase;
-    final fallbackEnabled = firebaseUserId != null && _canUseFirebase;
-    if (!primaryEnabled && !fallbackEnabled) return [];
-
-    final expenses = primaryEnabled && fallbackEnabled
-        ? await _loadSyncedExpenses(
-            logLabel: 'Expense month $month/$year',
-            primaryFetch: () => _fetchSupabaseExpensesByMonth(month, year),
-            fallbackFetch: () => _fetchFirebaseExpensesByMonth(month, year),
-            pushToPrimary: _saveExpenseToSupabase,
-            pushToFallback: _saveExpenseToFirebase,
-          )
-        : primaryEnabled
-        ? await _fetchSupabaseExpensesByMonth(month, year)
-        : await _fetchFirebaseExpensesByMonth(month, year);
+    final expenses = await _loadSyncedExpenses(
+      logLabel: 'Expense month $month/$year',
+      primaryFetch: () => _fetchSupabaseExpensesByMonth(month, year),
+      fallbackFetch: () => _fetchFirebaseExpensesByMonth(month, year),
+    );
 
     return expenses.map((expense) => _expenseToMap(expense)).toList();
   }
@@ -141,39 +129,19 @@ class ExpenseService {
     required DateTime startMonth,
     required DateTime endMonth,
   }) async {
-    final primaryEnabled = supabaseUserId != null && _canUseSupabase;
-    final fallbackEnabled = firebaseUserId != null && _canUseFirebase;
-    if (!primaryEnabled && !fallbackEnabled) return [];
-
     final normalizedStart = DateTime(startMonth.year, startMonth.month);
     final normalizedEnd = DateTime(endMonth.year, endMonth.month);
 
-    if (primaryEnabled && fallbackEnabled) {
-      return _loadSyncedExpenses(
-        logLabel: 'Expense range',
-        primaryFetch: () => _fetchSupabaseExpensesByRange(
-          startMonth: normalizedStart,
-          endMonth: normalizedEnd,
-        ),
-        fallbackFetch: () => _fetchFirebaseExpensesByRange(
-          startMonth: normalizedStart,
-          endMonth: normalizedEnd,
-        ),
-        pushToPrimary: _saveExpenseToSupabase,
-        pushToFallback: _saveExpenseToFirebase,
-      );
-    }
-
-    if (primaryEnabled) {
-      return _fetchSupabaseExpensesByRange(
+    return _loadSyncedExpenses(
+      logLabel: 'Expense range',
+      primaryFetch: () => _fetchSupabaseExpensesByRange(
         startMonth: normalizedStart,
         endMonth: normalizedEnd,
-      );
-    }
-
-    return _fetchFirebaseExpensesByRange(
-      startMonth: normalizedStart,
-      endMonth: normalizedEnd,
+      ),
+      fallbackFetch: () => _fetchFirebaseExpensesByRange(
+        startMonth: normalizedStart,
+        endMonth: normalizedEnd,
+      ),
     );
   }
 
@@ -200,24 +168,11 @@ class ExpenseService {
   }
 
   static Future<List<double>> getMonthlyTotalsByYear(int year) async {
-    final primaryEnabled = supabaseUserId != null && _canUseSupabase;
-    final fallbackEnabled = firebaseUserId != null && _canUseFirebase;
-
-    if (!primaryEnabled && !fallbackEnabled) {
-      return List.filled(12, 0.0);
-    }
-
-    final expenses = primaryEnabled && fallbackEnabled
-        ? await _loadSyncedExpenses(
-            logLabel: 'Expense year $year',
-            primaryFetch: () => _fetchSupabaseExpensesByYear(year),
-            fallbackFetch: () => _fetchFirebaseExpensesByYear(year),
-            pushToPrimary: _saveExpenseToSupabase,
-            pushToFallback: _saveExpenseToFirebase,
-          )
-        : primaryEnabled
-        ? await _fetchSupabaseExpensesByYear(year)
-        : await _fetchFirebaseExpensesByYear(year);
+    final expenses = await _loadSyncedExpenses(
+      logLabel: 'Expense year $year',
+      primaryFetch: () => _fetchSupabaseExpensesByYear(year),
+      fallbackFetch: () => _fetchFirebaseExpensesByYear(year),
+    );
 
     final monthlyTotals = List.filled(12, 0.0);
     for (final expense in expenses) {
@@ -296,9 +251,10 @@ class ExpenseService {
         };
 
         if (updateData.length > 1) {
-          await _firestore.collection('expenses').doc(expenseId).update(
-                updateData,
-              );
+          await _firestore
+              .collection('expenses')
+              .doc(expenseId)
+              .update(updateData);
           SourceCircuitBreaker.markSuccess(_firebaseKey);
           success = true;
         }
@@ -315,49 +271,20 @@ class ExpenseService {
     required String logLabel,
     required Future<List<Expense>> Function() primaryFetch,
     required Future<List<Expense>> Function() fallbackFetch,
-    required Future<bool> Function(Expense expense) pushToPrimary,
-    required Future<bool> Function(Expense expense) pushToFallback,
-  }) async {
-    final primaryEnabled = _canUseSupabase;
-    final fallbackEnabled = _canUseFirebase;
-
-    if (primaryEnabled && fallbackEnabled) {
-      return reconcileBetweenSources<Expense>(
-        primarySourceKey: _supabaseKey,
-        fallbackSourceKey: _firebaseKey,
-        logLabel: logLabel,
-        primaryFetch: primaryFetch,
-        fallbackFetch: fallbackFetch,
-        pushToPrimary: pushToPrimary,
-        pushToFallback: pushToFallback,
-        itemId: (expense) => expense.id ?? '',
-        sortItems: _sortExpenses,
-      );
-    }
-
-    if (primaryEnabled) {
-      try {
-        final data = await primaryFetch();
-        SourceCircuitBreaker.markSuccess(_supabaseKey);
-        return _sortExpenses(data);
-      } catch (error) {
-        debugPrint('$logLabel primary fetch failed: $error');
-        SourceCircuitBreaker.markFailure(_supabaseKey);
-      }
-    }
-
-    if (fallbackEnabled) {
-      try {
-        final data = await fallbackFetch();
-        SourceCircuitBreaker.markSuccess(_firebaseKey);
-        return _sortExpenses(data);
-      } catch (error) {
-        debugPrint('$logLabel fallback fetch failed: $error');
-        SourceCircuitBreaker.markFailure(_firebaseKey);
-      }
-    }
-
-    return [];
+  }) {
+    return loadFromSources<Expense>(
+      primaryEnabled: supabaseUserId != null && _canUseSupabase,
+      fallbackEnabled: firebaseUserId != null && _canUseFirebase,
+      primarySourceKey: _supabaseKey,
+      fallbackSourceKey: _firebaseKey,
+      logLabel: logLabel,
+      primaryFetch: primaryFetch,
+      fallbackFetch: fallbackFetch,
+      pushToPrimary: _saveExpenseToSupabase,
+      pushToFallback: _saveExpenseToFirebase,
+      itemId: (expense) => expense.id ?? '',
+      sortItems: _sortExpenses,
+    );
   }
 
   static Future<List<Expense>> _fetchFirebaseExpensesByMonth(
@@ -442,18 +369,11 @@ class ExpenseService {
     return _sortExpenses(res);
   }
 
-  static Future<List<Expense>> _fetchSupabaseExpensesByYear(int year) async {
-    final expenses = <Expense>[];
-    for (var month = 1; month <= 12; month++) {
-      final monthExpenses = await SupabaseExpenseService.getExpensesByMonth(
-        month: month,
-        year: year,
-        userId: supabaseUserId!,
-      );
-      expenses.addAll(monthExpenses);
-    }
-
-    return _sortExpenses(expenses);
+  static Future<List<Expense>> _fetchSupabaseExpensesByYear(int year) {
+    return _fetchSupabaseExpensesByRange(
+      startMonth: DateTime(year, 1),
+      endMonth: DateTime(year, 12),
+    );
   }
 
   static Future<List<Expense>> _fetchSupabaseExpensesByRange({
@@ -475,7 +395,10 @@ class ExpenseService {
 
     try {
       final firebaseExpense = expense.copyWith(userId: firebaseUserId!);
-      await _firestore.collection('expenses').doc(expense.id).set(
+      await _firestore
+          .collection('expenses')
+          .doc(expense.id)
+          .set(
             _expenseToFirestoreMap(firebaseExpense),
             SetOptions(merge: true),
           );

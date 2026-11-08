@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -10,6 +9,10 @@ import '../../blocs/expense/expense_state.dart';
 import '../../models/expense.dart';
 import '../../service/expense_export_service.dart';
 import '../../shared/widgets/linear_header.dart';
+import 'widgets/add_expense_sheet.dart';
+import 'widgets/expense_category_style.dart';
+import 'widgets/expense_export_sheet.dart';
+import 'widgets/monthly_expense_details_sheet.dart';
 
 class SpendingScreen extends StatefulWidget {
   const SpendingScreen({super.key});
@@ -24,7 +27,6 @@ class _SpendingScreenState extends State<SpendingScreen> {
   int _selectedYear = DateTime.now().year;
   int _selectedMonth = DateTime.now().month;
 
-  List<ExpenseCategory> get _categories => ExpenseCategory.values;
   List<String> get _categoryKeys => ExpenseCategory.allKeys;
 
   List<String> get _categoryName => ExpenseCategory.allDisplayNames;
@@ -180,7 +182,8 @@ class _SpendingScreenState extends State<SpendingScreen> {
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         for (
                                           int i = 0;
@@ -189,7 +192,7 @@ class _SpendingScreenState extends State<SpendingScreen> {
                                         )
                                           _buildLegendItem(
                                             _categoryName[i],
-                                            _getColorForCategory(i),
+                                            ExpenseCategoryStyle.colorAt(i),
                                             i,
                                             categoryData,
                                           ),
@@ -444,196 +447,14 @@ class _SpendingScreenState extends State<SpendingScreen> {
     );
   }
 
-  void _showExportBottomSheet() {
-    final now = DateTime.now();
-    final years = List<int>.generate(
-      now.year - 2019,
-      (index) => 2020 + index,
-    ).reversed.toList();
-    int startMonth = _selectedMonth;
-    int startYear = _selectedYear;
-    int endMonth = _selectedMonth;
-    int endYear = _selectedYear;
-    String? errorText;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (modalContext) => StatefulBuilder(
-        builder: (context, setModalState) {
-          final totalMonths = _getSelectedMonthCount(
-            startYear: startYear,
-            startMonth: startMonth,
-            endYear: endYear,
-            endMonth: endMonth,
-          );
-
-          return SafeArea(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'Xuất dữ liệu chi tiêu',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Chọn khoảng thánh cần xuất. Tối đa 12 tháng.',
-                      style: TextStyle(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.7),
-                      ),
-                    ),
-                    SizedBox(height: 20),
-                    _buildMonthYearPicker(
-                      title: 'Từ tháng',
-                      selectedMonth: startMonth,
-                      selectedYear: startYear,
-                      years: years,
-                      onMonthChanged: (value) {
-                        setModalState(() {
-                          startMonth = value!;
-                          errorText = null;
-                        });
-                      },
-                      onYearChanged: (value) {
-                        setModalState(() {
-                          startYear = value!;
-                          errorText = null;
-                        });
-                      },
-                    ),
-                    SizedBox(height: 12),
-                    _buildMonthYearPicker(
-                      title: 'Đến tháng',
-                      selectedMonth: endMonth,
-                      selectedYear: endYear,
-                      years: years,
-                      onMonthChanged: (value) {
-                        setModalState(() {
-                          endMonth = value!;
-                          errorText = null;
-                        });
-                      },
-                      onYearChanged: (value) {
-                        setModalState(() {
-                          endYear = value!;
-                          errorText = null;
-                        });
-                      },
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      'Số tháng đã chọn: $totalMonths',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color:
-                            totalMonths > ExpenseExportService.maxExportMonths
-                            ? Colors.red
-                            : Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    if (errorText != null) ...[
-                      SizedBox(height: 8),
-                      Text(errorText!, style: TextStyle(color: Colors.red)),
-                    ],
-                    SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () => Navigator.pop(modalContext),
-                            style: ElevatedButton.styleFrom(
-                              shadowColor: Colors.transparent,
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.primary.withValues(alpha: 0.12),
-                              foregroundColor: Theme.of(
-                                context,
-                              ).colorScheme.primary,
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                            ),
-                            child: Text('Đóng'),
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () async {
-                              final startDate = DateTime(startYear, startMonth);
-                              final endDate = DateTime(endYear, endMonth);
-
-                              if (startDate.isAfter(endDate)) {
-                                setModalState(() {
-                                  errorText =
-                                      'Tháng bắt đầu phải nhỏ hơn hoặc bằng tháng kết thúc.';
-                                });
-                                return;
-                              }
-
-                              if (totalMonths >
-                                  ExpenseExportService.maxExportMonths) {
-                                setModalState(() {
-                                  errorText =
-                                      'Bạn chỉ có thể xuất tối đa 12 tháng mỗi lần.';
-                                });
-                                return;
-                              }
-
-                              Navigator.pop(modalContext);
-                              await _exportExpenses(
-                                startMonth: startDate,
-                                endMonth: endDate,
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.primary,
-                              foregroundColor: Theme.of(
-                                context,
-                              ).colorScheme.onPrimary,
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                            ),
-                            child: Text('Xuất file'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
+  Future<void> _showExportBottomSheet() async {
+    final range = await ExpenseExportSheet.show(
+      context,
+      initialMonth: _selectedMonth,
+      initialYear: _selectedYear,
     );
+    if (range == null || !mounted) return;
+    await _exportExpenses(startMonth: range.start, endMonth: range.end);
   }
 
   Future<void> _exportExpenses({
@@ -687,77 +508,6 @@ class _SpendingScreenState extends State<SpendingScreen> {
         });
       }
     }
-  }
-
-  Widget _buildMonthYearPicker({
-    required String title,
-    required int selectedMonth,
-    required int selectedYear,
-    required List<int> years,
-    required ValueChanged<int?> onMonthChanged,
-    required ValueChanged<int?> onYearChanged,
-  }) {
-    return Container(
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: TextStyle(fontWeight: FontWeight.w600)),
-          SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<int>(
-                  initialValue: selectedMonth,
-                  decoration: InputDecoration(
-                    labelText: 'Tháng',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: List.generate(12, (index) {
-                    final month = index + 1;
-                    return DropdownMenuItem(
-                      value: month,
-                      child: Text('Tháng $month'),
-                    );
-                  }),
-                  onChanged: onMonthChanged,
-                ),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: DropdownButtonFormField<int>(
-                  initialValue: selectedYear,
-                  decoration: InputDecoration(
-                    labelText: 'Năm',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: years.map((year) {
-                    return DropdownMenuItem(
-                      value: year,
-                      child: Text(year.toString()),
-                    );
-                  }).toList(),
-                  onChanged: onYearChanged,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  int _getSelectedMonthCount({
-    required int startYear,
-    required int startMonth,
-    required int endYear,
-    required int endMonth,
-  }) {
-    return (endYear - startYear) * 12 + endMonth - startMonth + 1;
   }
 
   Widget _buildSummaryCard() {
@@ -833,36 +583,9 @@ class _SpendingScreenState extends State<SpendingScreen> {
     );
   }
 
-  Color _getColorForCategory(int index) {
-    final colors = [
-      Color(0xFF3B82F6),
-      Color(0xFF10B981),
-      Color(0xFFF59E0B),
-      Color(0xFF8B5CF6),
-      Color(0xFFEF4444),
-      Color(0xFFEC4899),
-      Color(0xFF06B6D4),
-      Color(0xFF84CC16),
-      Color(0xFF6B7280),
-    ];
-    return colors[index % colors.length];
-  }
-
   List<PieChartSectionData> _buildPieChartSections(
     Map<String, double> categoryData,
   ) {
-    final colors = [
-      Color(0xFF3B82F6),
-      Color(0xFF10B981),
-      Color(0xFFF59E0B),
-      Color(0xFF8B5CF6),
-      Color(0xFFEF4444),
-      Color(0xFFEC4899),
-      Color(0xFF06B6D4),
-      Color(0xFF84CC16),
-      Color(0xFF6B7280),
-    ];
-
     double total = categoryData.values.fold(
       0.0,
       (accumulator, value) => accumulator + value,
@@ -889,7 +612,7 @@ class _SpendingScreenState extends State<SpendingScreen> {
       double percentage = (entry.value / total) * 100;
 
       return PieChartSectionData(
-        color: colors[index % colors.length],
+        color: ExpenseCategoryStyle.colorAt(index),
         value: entry.value,
         title: '${percentage.toStringAsFixed(1)}%',
         radius: 50,
@@ -951,492 +674,15 @@ class _SpendingScreenState extends State<SpendingScreen> {
   }
 
   void _showMonthlyDetails() {
-    context.read<ExpenseBloc>().add(
-      LoadExpensesByMonthEvent(month: _selectedMonth, year: _selectedYear),
+    MonthlyExpenseDetailsSheet.show(
+      context,
+      month: _selectedMonth,
+      year: _selectedYear,
+      showAmounts: _isShow,
     );
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (modalContext) => SafeArea(
-        child: Container(
-          height: MediaQuery.of(context).size.height * 0.6,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'Chi tiết tháng $_selectedMonth/$_selectedYear',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: BlocConsumer<ExpenseBloc, ExpenseState>(
-                  listener: (context, state) {
-                    if (state is ExpenseDeleteSuccess) {
-                      Navigator.pop(modalContext);
-                    }
-                  },
-                  builder: (context, state) {
-                    final isLoading =
-                        state is ExpenseLoading || state is ExpenseLoadingData;
-                    List<Map<String, dynamic>> expenses = [];
-                    if (state is ExpenseLoaded) {
-                      expenses = state.expenses;
-                    }
-
-                    if (isLoading) {
-                      return Center(
-                        child: CircularProgressIndicator(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      );
-                    }
-
-                    if (expenses.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.receipt_long_outlined,
-                              size: 48,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.5),
-                            ),
-                            SizedBox(height: 16),
-                            Text(
-                              'Chưa có chi tiêu nào trong tháng này',
-                              style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.7),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-
-                    return ListView.builder(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: expenses.length,
-                      itemBuilder: (context, index) {
-                        final expense = expenses[index];
-                        final id = expense['id'] as String;
-                        final category = expense['category'] as String;
-                        final amount = (expense['amount'] as num).toDouble();
-                        final description = expense['description'] as String;
-                        final date = (expense['date'] as Timestamp).toDate();
-
-                        final categoryIndex = _categoryKeys.indexOf(category);
-                        final displayName = categoryIndex >= 0
-                            ? _categoryName[categoryIndex]
-                            : category;
-
-                        return Dismissible(
-                          key: Key(id),
-                          direction: DismissDirection.endToStart,
-                          confirmDismiss: (direction) async {
-                            return await showDialog<bool>(
-                                  context: context,
-                                  builder: (BuildContext context) {
-                                    return AlertDialog(
-                                      title: Text('Xác nhận xóa'),
-                                      content: Text(
-                                        'Bạn có chắc chắn muốn xóa chi tiêu này?',
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.of(context).pop(false),
-                                          child: Text('Huỷ'),
-                                        ),
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.of(context).pop(true),
-                                          child: Text('Xoá'),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                ) ??
-                                false;
-                          },
-                          onDismissed: (direction) {
-                            context.read<ExpenseBloc>().add(
-                              DeleteExpenseEvent(id: id, date: date),
-                            );
-                          },
-                          child: Card(
-                            margin: EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: _getColorForCategory(
-                                  categoryIndex >= 0 ? categoryIndex : _otherCategoryIndex,
-                                ),
-                                child: Icon(
-                                  _getIconForCategory(categoryIndex),
-                                  color: Colors.white,
-                                ),
-                              ),
-                              title: Text(displayName),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (description.isNotEmpty) Text(description),
-                                  Text(
-                                    '${date.day}/${date.month}/${date.year}',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                ],
-                              ),
-                              trailing: Text(
-                                _isShow
-                                    ? NumberHelper.formatCurrency(amount)
-                                    : NumberHelper.hideMoney(),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  IconData _getIconForCategory(int index) {
-    final icons = [
-      Icons.restaurant, // Food
-      Icons.inventory_outlined, // Bills
-      Icons.shopping_cart, // Shopping
-      Icons.pedal_bike, // Transport
-      Icons.family_restroom, // Family
-      Icons.celebration_outlined, // Social
-      Icons.person_outline, // Personal
-      Icons.handshake_outlined, // Lend
-      Icons.more_horiz, // Other
-    ];
-    return index >= 0 && index < icons.length ? icons[index] : Icons.more_horiz;
-  }
-  List<String> _getQuickSuggestions(String categoryKey) {
-    return ExpenseCategory.fromKey(categoryKey).quickSuggestions;
-  }
-  String _displayCategoryName(String categoryKey) {
-    return ExpenseCategory.fromKey(categoryKey).displayName;
-  }
-  int get _otherCategoryIndex => _categoryKeys.indexOf('Other');
-  void _applyQuickSuggestion(
-    TextEditingController controller,
-    String suggestion,
-  ) {
-    controller
-      ..text = suggestion
-      ..selection = TextSelection.collapsed(offset: suggestion.length);
   }
 
   void _showAddExpenseForm() {
-    final formKey = GlobalKey<FormState>();
-    String selectedCategory = _categoryKeys.first;
-    double amount = 0;
-    String description = '';
-    DateTime selectedDate = DateTime.now();
-    final descriptionController = TextEditingController();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (modalContext) => StatefulBuilder(
-        builder: (context, setModalState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(modalContext).viewInsets.bottom,
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Theme.of(modalContext).colorScheme.surface,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: SafeArea(
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                modalContext,
-                              ).colorScheme.onSurface.withValues(alpha: 0.3),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            'Th\u00eam chi ti\u00eau m\u1edbi',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          DropdownButtonFormField<String>(
-                            initialValue: selectedCategory,
-                            decoration: InputDecoration(
-                              labelText: 'Danh mục',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            items: _categories.map((category) {
-                              return DropdownMenuItem(
-                                value: category.key,
-                                child: Text(category.displayName),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              if (value == null) return;
-                              setModalState(() {
-                                selectedCategory = value;
-                              });
-                            },
-                          ),
-                          SizedBox(height: 16),
-                          TextFormField(
-                            decoration: InputDecoration(
-                              labelText: 'Số tiền',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              suffixText: 'VND',
-                            ),
-                            keyboardType: TextInputType.number,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Vui lòng nhập số tiền';
-                              }
-                              final parsedAmount = double.tryParse(value);
-                              if (parsedAmount == null || parsedAmount <= 0) {
-                                return 'Vui lòng nhập số tiền hợp lệ';
-                              }
-                              return null;
-                            },
-                            onSaved: (value) =>
-                                amount = double.tryParse(value!) ?? 0,
-                          ),
-                          SizedBox(height: 16),
-                          TextFormField(
-                            controller: descriptionController,
-                            decoration: InputDecoration(
-                              labelText: 'Mô tả',
-                              hintText:
-                                  'Nhập chữ hoặc chọn gợi ý nhanh',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            maxLines: 3,
-                            onSaved: (value) => description = value ?? '',
-                          ),
-                          if (_getQuickSuggestions(selectedCategory).isNotEmpty) ...[
-                            SizedBox(height: 12),
-                            Text(
-                              'Gợi ý nhanh cho ${_displayCategoryName(selectedCategory)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Theme.of(
-                                  modalContext,
-                                ).colorScheme.onSurface.withValues(alpha: 0.75),
-                              ),
-                            ),
-                            SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: _getQuickSuggestions(selectedCategory)
-                                  .map(
-                                    (suggestion) => ActionChip(
-                                      label: Text(suggestion),
-                                      onPressed: () => _applyQuickSuggestion(
-                                        descriptionController,
-                                        suggestion,
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
-                          ],
-                          SizedBox(height: 16),
-                          TextFormField(
-                            decoration: InputDecoration(
-                              labelText: 'Ngày',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              suffixIcon: Icon(Icons.calendar_today),
-                            ),
-                            readOnly: true,
-                            controller: TextEditingController(
-                              text:
-                                  '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                            ),
-                            onTap: () async {
-                              final DateTime? picked = await showDatePicker(
-                                context: context,
-                                initialDate: selectedDate,
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime.now(),
-                              );
-                              if (picked != null && picked != selectedDate) {
-                                setModalState(() {
-                                  selectedDate = picked;
-                                });
-                              }
-                            },
-                          ),
-                          SizedBox(height: 24),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    descriptionController.dispose();
-                                    Navigator.pop(modalContext);
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    shadowColor: Colors.transparent,
-                                    backgroundColor: Theme.of(
-                                      modalContext,
-                                    ).colorScheme.primary.withValues(alpha: 0.2),
-                                    foregroundColor: Theme.of(
-                                      modalContext,
-                                    ).colorScheme.primary,
-                                    padding: EdgeInsets.symmetric(vertical: 12),
-                                  ),
-                                  child: Text('Hủy'),
-                                ),
-                              ),
-                              SizedBox(width: 16),
-                              Expanded(
-                                child: BlocConsumer<ExpenseBloc, ExpenseState>(
-                                  listener: (context, state) {
-                                    if (state is ExpenseAddSuccess) {
-                                      descriptionController.dispose();
-                                      Navigator.pop(modalContext);
-                                    }
-                                  },
-                                  builder: (context, state) {
-                                    final isLoading =
-                                        state is ExpenseLoading ||
-                                        state is ExpenseLoadingData;
-                                    return ElevatedButton(
-                                      onPressed: isLoading
-                                          ? null
-                                          : () {
-                                              if (formKey.currentState!
-                                                  .validate()) {
-                                                formKey.currentState!.save();
-                                                context.read<ExpenseBloc>().add(
-                                                  AddExpenseEvent(
-                                                    category: selectedCategory,
-                                                    amount: amount,
-                                                    description: description,
-                                                    date: selectedDate,
-                                                  ),
-                                                );
-                                              }
-                                            },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Theme.of(
-                                          modalContext,
-                                        ).colorScheme.primary,
-                                        foregroundColor: Theme.of(
-                                          modalContext,
-                                        ).colorScheme.onPrimary,
-                                        padding: EdgeInsets.symmetric(
-                                          vertical: 12,
-                                        ),
-                                      ),
-                                      child: isLoading
-                                          ? SizedBox(
-                                              height: 20,
-                                              width: 20,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                valueColor:
-                                                    AlwaysStoppedAnimation<Color>(
-                                                      Theme.of(
-                                                        modalContext,
-                                                      ).colorScheme.onPrimary,
-                                                    ),
-                                              ),
-                                            )
-                                          : Text('Lưu'),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    AddExpenseSheet.show(context);
   }
 }

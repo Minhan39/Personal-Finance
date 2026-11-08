@@ -146,7 +146,7 @@ class _SaveScreenState extends State<SaveScreen> {
                         );
                         final value = double.parse(_gold!.purchasePrice);
                         final p =
-                            value - capital - NumberHelper.GOLD_DIFFERENCE;
+                            value - capital - NumberHelper.goldDifference;
                         profit = NumberHelper.formatCurrency(p);
                         percent = '${(p * 100 / capital).toStringAsFixed(2)}%';
                       }

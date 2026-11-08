@@ -81,10 +81,7 @@ Future<List<T>> reconcileBetweenSources<T>({
   }
 
   final merged = <String, T>{};
-  for (final item in <T>[
-    ...?primaryItems,
-    ...?fallbackItems,
-  ]) {
+  for (final item in <T>[...?primaryItems, ...?fallbackItems]) {
     final id = itemId(item);
     if (id.isEmpty) {
       continue;
@@ -155,4 +152,62 @@ Future<void> _syncMissingItems<T>({
       }
     }
   }
+}
+
+/// Loads items from whichever sources are currently enabled.
+///
+/// With both sources enabled the results are reconciled. With only one
+/// enabled it is read directly, and if the primary read fails the fallback
+/// is tried. A failing source is reported to [SourceCircuitBreaker]; when
+/// every source fails, an empty list is returned.
+Future<List<T>> loadFromSources<T>({
+  required bool primaryEnabled,
+  required bool fallbackEnabled,
+  required String primarySourceKey,
+  required String fallbackSourceKey,
+  required String logLabel,
+  required SourceFetch<T> primaryFetch,
+  required SourceFetch<T> fallbackFetch,
+  required SourceWrite<T> pushToPrimary,
+  required SourceWrite<T> pushToFallback,
+  required SourceId<T> itemId,
+  required SourceSort<T> sortItems,
+}) async {
+  if (primaryEnabled && fallbackEnabled) {
+    return reconcileBetweenSources<T>(
+      primarySourceKey: primarySourceKey,
+      fallbackSourceKey: fallbackSourceKey,
+      logLabel: logLabel,
+      primaryFetch: primaryFetch,
+      fallbackFetch: fallbackFetch,
+      pushToPrimary: pushToPrimary,
+      pushToFallback: pushToFallback,
+      itemId: itemId,
+      sortItems: sortItems,
+    );
+  }
+
+  if (primaryEnabled) {
+    try {
+      final items = await primaryFetch();
+      SourceCircuitBreaker.markSuccess(primarySourceKey);
+      return sortItems(items);
+    } catch (error) {
+      debugPrint('$logLabel primary fetch failed: $error');
+      SourceCircuitBreaker.markFailure(primarySourceKey);
+    }
+  }
+
+  if (fallbackEnabled) {
+    try {
+      final items = await fallbackFetch();
+      SourceCircuitBreaker.markSuccess(fallbackSourceKey);
+      return sortItems(items);
+    } catch (error) {
+      debugPrint('$logLabel fallback fetch failed: $error');
+      SourceCircuitBreaker.markFailure(fallbackSourceKey);
+    }
+  }
+
+  return const [];
 }

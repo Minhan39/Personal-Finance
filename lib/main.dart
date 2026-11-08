@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -17,41 +19,20 @@ import 'navigator/navigator.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+
   const webClientId =
       '822917060497-1kf4cpbpun4s2gjvi9odhb1vfjlg9rqj.apps.googleusercontent.com';
-  await GoogleSignIn.instance.initialize(
-    serverClientId: webClientId,
-  );
-  await Supabase.initialize(
-    url: 'https://fmimpmegzytqaztnzsqh.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtaW1wbWVnenl0cWF6dG56c3FoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NDI2NTgsImV4cCI6MjA5MjExODY1OH0.X7wnz-9H0trjbCEujZFuAYJDTpUX35RglJDAMiM5oVo',
-  );
 
-  final messaging = FirebaseMessaging.instance;
-
-  final settings = await messaging.requestPermission(
-    alert: true,
-    badge: true,
-    sound: true,
-  );
-
-  debugPrint('Permission: ${settings.authorizationStatus}');
-
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    debugPrint('Title: ${message.notification?.title}');
-    debugPrint('Body: ${message.notification?.body}');
-  });
-
-  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-    debugPrint("Opened from notification");
-  });
-
-  final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
-  if (initialMessage != null) {
-    debugPrint("Opened app from terminated state");
-  }
+  // These services are independent of each other, so start them together.
+  await Future.wait([
+    Firebase.initializeApp(),
+    GoogleSignIn.instance.initialize(serverClientId: webClientId),
+    Supabase.initialize(
+      url: 'https://fmimpmegzytqaztnzsqh.supabase.co',
+      anonKey:
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtaW1wbWVnenl0cWF6dG56c3FoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NDI2NTgsImV4cCI6MjA5MjExODY1OH0.X7wnz-9H0trjbCEujZFuAYJDTpUX35RglJDAMiM5oVo',
+    ),
+  ]);
 
   runApp(
     MultiBlocProvider(
@@ -65,6 +46,38 @@ void main() async {
       child: const MyApp(),
     ),
   );
+
+  // The notification permission prompt waits for the user, so it must not
+  // hold up the first frame.
+  unawaited(_setUpMessaging());
+}
+
+Future<void> _setUpMessaging() async {
+  try {
+    final messaging = FirebaseMessaging.instance;
+    final settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    debugPrint('Permission: ${settings.authorizationStatus}');
+
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint('Title: ${message.notification?.title}');
+      debugPrint('Body: ${message.notification?.body}');
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      debugPrint('Opened from notification');
+    });
+
+    final initialMessage = await messaging.getInitialMessage();
+    if (initialMessage != null) {
+      debugPrint('Opened app from terminated state');
+    }
+  } catch (error) {
+    debugPrint('FCM setup failed: $error');
+  }
 }
 
 class MyApp extends StatelessWidget {

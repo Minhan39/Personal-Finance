@@ -1,7 +1,7 @@
 import 'package:intl/intl.dart';
 
 class NumberHelper {
-  static const GOLD_DIFFERENCE = 1_200_00;
+  static const goldDifference = 120_000;
 
   static String hideMoney() => '***.000,00 đ';
 

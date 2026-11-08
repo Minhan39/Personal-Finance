@@ -30,10 +30,7 @@ class SupabaseExpenseService {
 
       final request = firebaseId == null
           ? _client.from('expenses').insert(payload)
-          : _client.from('expenses').upsert(
-              payload,
-              onConflict: 'firebase_id',
-            );
+          : _client.from('expenses').upsert(payload, onConflict: 'firebase_id');
 
       await request;
       return firebaseId ?? '';
@@ -61,7 +58,13 @@ class SupabaseExpenseService {
 
   static Future<bool> deleteExpense(String firebaseId) async {
     try {
-      await _client.from('expenses').delete().eq('firebase_id', firebaseId);
+      final userId = currentUserId;
+      if (userId == null) return false;
+      await _client
+          .from('expenses')
+          .delete()
+          .eq('firebase_id', firebaseId)
+          .eq('user_id', userId);
       return true;
     } catch (e) {
       debugPrint('Supabase deleteExpense error: $e');
@@ -89,7 +92,13 @@ class SupabaseExpenseService {
         data['year'] = date.year;
       }
 
-      await _client.from('expenses').update(data).eq('firebase_id', firebaseId);
+      final userId = currentUserId;
+      if (userId == null) return false;
+      await _client
+          .from('expenses')
+          .update(data)
+          .eq('firebase_id', firebaseId)
+          .eq('user_id', userId);
       return true;
     } catch (e) {
       debugPrint('Supabase updateExpense error: $e');
@@ -97,48 +106,40 @@ class SupabaseExpenseService {
     }
   }
 
+  // Read methods let errors propagate: the sync layer relies on exceptions
+  // to tell "source unavailable" apart from "source has no rows".
   static Future<List<Expense>> getExpensesByMonth({
     required int month,
     required int year,
     required String userId,
   }) async {
-    try {
-      final res = await _client
-          .from('expenses')
-          .select()
-          .eq('user_id', userId)
-          .eq('month', month)
-          .eq('year', year)
-          .order('date', ascending: false);
+    final res = await _client
+        .from('expenses')
+        .select()
+        .eq('user_id', userId)
+        .eq('month', month)
+        .eq('year', year)
+        .order('date', ascending: false);
 
-      return (res as List).map((row) => Expense.fromSupabase(row)).toList();
-    } catch (e) {
-      debugPrint('Supabase getExpensesByMonth error: $e');
-      return [];
-    }
+    return (res as List).map((row) => Expense.fromSupabase(row)).toList();
   }
 
   static Future<List<double>> getMonthlyTotalsByYear({
     required int year,
     required String userId,
   }) async {
-    try {
-      final res = await _client
-          .from('expenses')
-          .select('month, amount')
-          .eq('user_id', userId)
-          .eq('year', year);
+    final res = await _client
+        .from('expenses')
+        .select('month, amount')
+        .eq('user_id', userId)
+        .eq('year', year);
 
-      final totals = List.filled(12, 0.0);
-      for (final row in res as List) {
-        final month = (row['month'] as int) - 1;
-        totals[month] += (row['amount'] as num).toDouble();
-      }
-      return totals;
-    } catch (e) {
-      debugPrint('Supabase getMonthlyTotalsByYear error: $e');
-      return List.filled(12, 0.0);
+    final totals = List.filled(12, 0.0);
+    for (final row in res as List) {
+      final month = (row['month'] as int) - 1;
+      totals[month] += (row['amount'] as num).toDouble();
     }
+    return totals;
   }
 
   static Future<List<Expense>> getExpensesByRange({
@@ -146,27 +147,22 @@ class SupabaseExpenseService {
     required DateTime endMonth,
     required String userId,
   }) async {
-    try {
-      final normalizedStart = DateTime(startMonth.year, startMonth.month);
-      final normalizedEnd = DateTime(endMonth.year, endMonth.month);
-      final rangeStart = normalizedStart.toIso8601String();
-      final rangeEnd = DateTime(
-        normalizedEnd.year,
-        normalizedEnd.month + 1,
-      ).toIso8601String();
+    final normalizedStart = DateTime(startMonth.year, startMonth.month);
+    final normalizedEnd = DateTime(endMonth.year, endMonth.month);
+    final rangeStart = normalizedStart.toIso8601String();
+    final rangeEnd = DateTime(
+      normalizedEnd.year,
+      normalizedEnd.month + 1,
+    ).toIso8601String();
 
-      final res = await _client
-          .from('expenses')
-          .select()
-          .eq('user_id', userId)
-          .gte('date', rangeStart)
-          .lt('date', rangeEnd)
-          .order('date', ascending: true);
+    final res = await _client
+        .from('expenses')
+        .select()
+        .eq('user_id', userId)
+        .gte('date', rangeStart)
+        .lt('date', rangeEnd)
+        .order('date', ascending: true);
 
-      return (res as List).map((row) => Expense.fromSupabase(row)).toList();
-    } catch (e) {
-      debugPrint('Supabase getExpensesByRange error: $e');
-      return [];
-    }
+    return (res as List).map((row) => Expense.fromSupabase(row)).toList();
   }
 }

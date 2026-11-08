@@ -141,10 +141,12 @@ class NoteService {
 
       if (title != null) updateData['title'] = title;
       if (content != null) updateData['content'] = content;
-      if (hasNotification != null)
+      if (hasNotification != null) {
         updateData['hasNotification'] = hasNotification;
-      if (notificationDate != null)
+      }
+      if (notificationDate != null) {
         updateData['notificationDate'] = notificationDate;
+      }
       if (isRecurring != null) updateData['isRecurring'] = isRecurring;
       if (recurringDays != null) updateData['recurringDays'] = recurringDays;
 

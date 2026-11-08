@@ -32,6 +32,11 @@ class IncomeService {
   CollectionReference<Map<String, dynamic>> get _incomeCollection =>
       _firestore.collection('incomes');
 
+  /// Older builds wrote `user_id`, newer ones `userId`; both are queried
+  /// and merged, always scoped to the signed-in Firebase user.
+  Query<Map<String, dynamic>> _userIncomes(String userField) =>
+      _incomeCollection.where(userField, isEqualTo: _firebaseUserId ?? '');
+
   bool get _canUseSupabase =>
       _supabaseEnabled && SourceCircuitBreaker.canUse(_supabaseKey);
 
@@ -168,19 +173,6 @@ class IncomeService {
     final normalizedStart = DateTime(startMonth.year, startMonth.month);
     final normalizedEnd = DateTime(endMonth.year, endMonth.month);
 
-    final primaryEnabled = _supabaseUserId != null && _canUseSupabase;
-    final fallbackEnabled = _canUseFirebase;
-
-    if (!primaryEnabled && !fallbackEnabled) {
-      return [];
-    }
-
-    if (!primaryEnabled) {
-      return _sortIncomes(
-        await _fetchFirebaseIncomesByRange(normalizedStart, normalizedEnd),
-      );
-    }
-
     return _loadSyncedIncomes(
       logLabel: 'Income range',
       primaryFetch: () => _fetchSupabaseIncomesByRange(
@@ -189,14 +181,12 @@ class IncomeService {
       ),
       fallbackFetch: () =>
           _fetchFirebaseIncomesByRange(normalizedStart, normalizedEnd),
-      pushToPrimary: _saveIncomeToSupabase,
-      pushToFallback: _saveIncomeToFirebase,
     );
   }
 
   Stream<List<IncomeModel>> watchByMonth(int month, int year) {
     final primaryEnabled = _supabaseUserId != null && _canUseSupabase;
-    final fallbackEnabled = _canUseFirebase;
+    final fallbackEnabled = _firebaseUserId != null && _canUseFirebase;
     if (!primaryEnabled && !fallbackEnabled) return Stream.value([]);
 
     if (!primaryEnabled) {
@@ -209,14 +199,12 @@ class IncomeService {
       fallbackStream: () => _watchFirebaseIncomeMonth(month, year),
       primaryFetch: () => _supabase.getByMonth(month, year),
       fallbackFetch: () => _fetchFirebaseIncomesByMonth(month, year),
-      pushToPrimary: _saveIncomeToSupabase,
-      pushToFallback: _saveIncomeToFirebase,
     );
   }
 
   Stream<List<IncomeModel>> watchByYear(int year) {
     final primaryEnabled = _supabaseUserId != null && _canUseSupabase;
-    final fallbackEnabled = _canUseFirebase;
+    final fallbackEnabled = _firebaseUserId != null && _canUseFirebase;
     if (!primaryEnabled && !fallbackEnabled) return Stream.value([]);
 
     if (!primaryEnabled) {
@@ -229,8 +217,6 @@ class IncomeService {
       fallbackStream: () => _watchFirebaseIncomeYear(year),
       primaryFetch: () => _supabase.getByYear(year),
       fallbackFetch: () => _fetchFirebaseIncomesByYear(year),
-      pushToPrimary: _saveIncomeToSupabase,
-      pushToFallback: _saveIncomeToFirebase,
     );
   }
 
@@ -238,52 +224,23 @@ class IncomeService {
     required String logLabel,
     required Future<List<IncomeModel>> Function() primaryFetch,
     required Future<List<IncomeModel>> Function() fallbackFetch,
-    required Future<bool> Function(IncomeModel income) pushToPrimary,
-    required Future<bool> Function(IncomeModel income) pushToFallback,
     List<IncomeModel>? primarySnapshot,
-  }) async {
-    final primaryEnabled = _canUseSupabase;
-    final fallbackEnabled = _canUseFirebase;
-
-    if (primaryEnabled && fallbackEnabled) {
-      return reconcileBetweenSources<IncomeModel>(
-        primarySourceKey: _supabaseKey,
-        fallbackSourceKey: _firebaseKey,
-        logLabel: logLabel,
-        primaryFetch: primarySnapshot != null
-            ? () async => primarySnapshot
-            : primaryFetch,
-        fallbackFetch: fallbackFetch,
-        pushToPrimary: pushToPrimary,
-        pushToFallback: pushToFallback,
-        itemId: (income) => income.id,
-        sortItems: _sortIncomes,
-      );
-    }
-
-    if (primaryEnabled) {
-      try {
-        final primary = primarySnapshot ?? await primaryFetch();
-        SourceCircuitBreaker.markSuccess(_supabaseKey);
-        return _sortIncomes(primary);
-      } catch (error) {
-        debugPrint('$logLabel primary fetch failed: $error');
-        SourceCircuitBreaker.markFailure(_supabaseKey);
-      }
-    }
-
-    if (fallbackEnabled) {
-      try {
-        final fallback = await fallbackFetch();
-        SourceCircuitBreaker.markSuccess(_firebaseKey);
-        return _sortIncomes(fallback);
-      } catch (error) {
-        debugPrint('$logLabel fallback fetch failed: $error');
-        SourceCircuitBreaker.markFailure(_firebaseKey);
-      }
-    }
-
-    return [];
+  }) {
+    return loadFromSources<IncomeModel>(
+      primaryEnabled: _supabaseUserId != null && _canUseSupabase,
+      fallbackEnabled: _firebaseUserId != null && _canUseFirebase,
+      primarySourceKey: _supabaseKey,
+      fallbackSourceKey: _firebaseKey,
+      logLabel: logLabel,
+      primaryFetch: primarySnapshot != null
+          ? () async => primarySnapshot
+          : primaryFetch,
+      fallbackFetch: fallbackFetch,
+      pushToPrimary: _saveIncomeToSupabase,
+      pushToFallback: _saveIncomeToFirebase,
+      itemId: (income) => income.id,
+      sortItems: _sortIncomes,
+    );
   }
 
   Stream<List<IncomeModel>> _buildSyncedWatchStream({
@@ -292,8 +249,6 @@ class IncomeService {
     required Stream<List<IncomeModel>> Function() fallbackStream,
     required Future<List<IncomeModel>> Function() primaryFetch,
     required Future<List<IncomeModel>> Function() fallbackFetch,
-    required Future<bool> Function(IncomeModel income) pushToPrimary,
-    required Future<bool> Function(IncomeModel income) pushToFallback,
   }) {
     final controller = StreamController<List<IncomeModel>>.broadcast();
     StreamSubscription<List<IncomeModel>>? primarySub;
@@ -312,8 +267,6 @@ class IncomeService {
           logLabel: logLabel,
           primaryFetch: primaryFetch,
           fallbackFetch: fallbackFetch,
-          pushToPrimary: pushToPrimary,
-          pushToFallback: pushToFallback,
           primarySnapshot: snapshot,
         );
         if (!controller.isClosed) {
@@ -363,8 +316,6 @@ class IncomeService {
         logLabel: logLabel,
         primaryFetch: primaryFetch,
         fallbackFetch: fallbackFetch,
-        pushToPrimary: pushToPrimary,
-        pushToFallback: pushToFallback,
       );
       if (!controller.isClosed) {
         controller.add(initial);
@@ -402,15 +353,13 @@ class IncomeService {
     int month,
     int year,
   ) async {
-    final primary = await _incomeCollection
-        .where('year', isEqualTo: year)
-        .where('month', isEqualTo: month)
-        .get();
+    final primary = await _userIncomes(
+      'userId',
+    ).where('year', isEqualTo: year).where('month', isEqualTo: month).get();
 
-    final legacy = await _incomeCollection
-        .where('year', isEqualTo: year)
-        .where('month', isEqualTo: month)
-        .get();
+    final legacy = await _userIncomes(
+      'user_id',
+    ).where('year', isEqualTo: year).where('month', isEqualTo: month).get();
 
     return _dedupeIncomes([
       ...primary.docs.map(
@@ -423,11 +372,13 @@ class IncomeService {
   }
 
   Future<List<IncomeModel>> _fetchFirebaseIncomesByYear(int year) async {
-    final primary = await _incomeCollection
-        .where('year', isEqualTo: year)
-        .get();
+    final primary = await _userIncomes(
+      'userId',
+    ).where('year', isEqualTo: year).get();
 
-    final legacy = await _incomeCollection.where('year', isEqualTo: year).get();
+    final legacy = await _userIncomes(
+      'user_id',
+    ).where('year', isEqualTo: year).get();
 
     return _dedupeIncomes([
       ...primary.docs.map(
@@ -452,7 +403,7 @@ class IncomeService {
       }
     }
 
-    primarySub = _incomeCollection
+    primarySub = _userIncomes('userId')
         .where('year', isEqualTo: year)
         .where('month', isEqualTo: month)
         .snapshots()
@@ -470,7 +421,7 @@ class IncomeService {
           },
         );
 
-    legacySub = _incomeCollection
+    legacySub = _userIncomes('user_id')
         .where('year', isEqualTo: year)
         .where('month', isEqualTo: month)
         .snapshots()
@@ -516,7 +467,7 @@ class IncomeService {
       }
     }
 
-    primarySub = _incomeCollection
+    primarySub = _userIncomes('userId')
         .where('year', isEqualTo: year)
         .snapshots()
         .listen(
@@ -533,7 +484,7 @@ class IncomeService {
           },
         );
 
-    legacySub = _incomeCollection
+    legacySub = _userIncomes('user_id')
         .where('year', isEqualTo: year)
         .snapshots()
         .listen(
