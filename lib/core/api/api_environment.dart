@@ -1,3 +1,1 @@
-enum ApiDomain {
-  gold
-}
+enum ApiDomain { gold }

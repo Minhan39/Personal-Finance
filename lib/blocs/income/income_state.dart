@@ -39,6 +39,7 @@ class IncomeLoaded extends IncomeState {
     required this.totalByType,
     required this.grandTotal,
     required this.monthlyTotals,
+    this.yearIncomes = const [],
   });
 
   final List<IncomeModel> incomes;
@@ -48,6 +49,9 @@ class IncomeLoaded extends IncomeState {
   final double grandTotal;
   final List<MonthlyTotal> monthlyTotals;
 
+  /// Every income of [selectedYear], for yearly views.
+  final List<IncomeModel> yearIncomes;
+
   IncomeLoaded copyWith({
     List<IncomeModel>? incomes,
     int? selectedMonth,
@@ -55,6 +59,7 @@ class IncomeLoaded extends IncomeState {
     Map<IncomeType, double>? totalByType,
     double? grandTotal,
     List<MonthlyTotal>? monthlyTotals,
+    List<IncomeModel>? yearIncomes,
   }) {
     return IncomeLoaded(
       incomes: incomes ?? this.incomes,
@@ -63,6 +68,7 @@ class IncomeLoaded extends IncomeState {
       totalByType: totalByType ?? this.totalByType,
       grandTotal: grandTotal ?? this.grandTotal,
       monthlyTotals: monthlyTotals ?? this.monthlyTotals,
+      yearIncomes: yearIncomes ?? this.yearIncomes,
     );
   }
 
@@ -74,6 +80,7 @@ class IncomeLoaded extends IncomeState {
     totalByType,
     grandTotal,
     monthlyTotals,
+    yearIncomes,
   ];
 }
 

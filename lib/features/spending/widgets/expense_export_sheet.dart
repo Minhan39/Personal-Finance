@@ -219,10 +219,7 @@ class _MonthYearPicker extends StatelessWidget {
               Expanded(
                 child: DropdownButtonFormField<int>(
                   initialValue: selectedMonth,
-                  decoration: const InputDecoration(
-                    labelText: 'Tháng',
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: const InputDecoration(labelText: 'Tháng'),
                   items: List.generate(12, (index) {
                     final month = index + 1;
                     return DropdownMenuItem(
@@ -239,10 +236,7 @@ class _MonthYearPicker extends StatelessWidget {
               Expanded(
                 child: DropdownButtonFormField<int>(
                   initialValue: selectedYear,
-                  decoration: const InputDecoration(
-                    labelText: 'Năm',
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: const InputDecoration(labelText: 'Năm'),
                   items: years
                       .map(
                         (year) => DropdownMenuItem(

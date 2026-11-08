@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -91,9 +91,6 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
                   decoration: InputDecoration(
                     labelText: 'Số tiền',
                     suffixText: '₫',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
                   ),
                   validator: (value) {
                     if (parseVnd(value ?? '') <= 0) {
@@ -112,9 +109,6 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
                   decoration: InputDecoration(
                     labelText: 'Ngày ghi nhận',
                     suffixIcon: const Icon(Icons.calendar_today),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
                   ),
                   onTap: _pickDate,
                 ),
@@ -122,12 +116,7 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
                 TextFormField(
                   controller: _noteController,
                   maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: 'Ghi chú',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
+                  decoration: InputDecoration(labelText: 'Ghi chú'),
                 ),
                 const SizedBox(height: 24),
                 SizedBox(

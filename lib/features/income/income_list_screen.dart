@@ -1,18 +1,17 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../blocs/income/income_bloc.dart';
 import '../../blocs/income/income_event.dart';
 import '../../blocs/income/income_state.dart';
 import '../../models/income_model.dart';
-import '../../shared/helpers/income_formatter.dart';
+import '../../shared/helpers/number_helper.dart';
+import '../../shared/ui/ui.dart';
+import 'widgets/income_tile.dart';
 
+/// All incomes of one month, filterable by source; swipe left to delete.
 class IncomeListScreen extends StatefulWidget {
-  const IncomeListScreen({
-    super.key,
-    required this.month,
-    required this.year,
-  });
+  const IncomeListScreen({super.key, required this.month, required this.year});
 
   final int month;
   final int year;
@@ -24,6 +23,9 @@ class IncomeListScreen extends StatefulWidget {
 class _IncomeListScreenState extends State<IncomeListScreen> {
   IncomeType? _filter;
 
+  /// Swiped-away rows, hidden until the stream drops them.
+  final _removedIds = <String>{};
+
   @override
   void initState() {
     super.initState();
@@ -34,198 +36,110 @@ class _IncomeListScreenState extends State<IncomeListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Thu nhập T${widget.month}/${widget.year}')),
-      body: Column(
-        children: [
-          SizedBox(
-            height: 56,
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              scrollDirection: Axis.horizontal,
+    return BlocBuilder<IncomeBloc, IncomeState>(
+      builder: (context, state) {
+        return ModuleScaffold(
+          title: 'Thu nhập T${widget.month}/${widget.year}',
+          children: [
+            PillRow(
               children: [
-                FilterChip(
+                PillChip(
+                  label: 'Tất cả',
                   selected: _filter == null,
-                  label: const Text('Tất cả'),
-                  onSelected: (_) => setState(() => _filter = null),
+                  onTap: () => setState(() => _filter = null),
                 ),
-                const SizedBox(width: 8),
-                ...IncomeType.values.map((type) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      selected: _filter == type,
-                      label: Text(type.label),
-                      onSelected: (_) => setState(() => _filter = type),
-                    ),
-                  );
-                }),
+                for (final type in IncomeType.values)
+                  PillChip(
+                    label: type.label,
+                    selected: _filter == type,
+                    onTap: () => setState(() => _filter = type),
+                  ),
               ],
             ),
-          ),
-          Expanded(
-            child: BlocBuilder<IncomeBloc, IncomeState>(
-              builder: (context, state) {
-                if (state is IncomeLoading || state is IncomeInitial) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (state is IncomeError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error_outline, size: 40, color: Colors.red),
-                          const SizedBox(height: 12),
-                          Text(
-                            state.message,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          ElevatedButton(
-                            onPressed: () {
-                              context.read<IncomeBloc>().add(
-                                IncomeMonthChanged(widget.month, widget.year),
-                              );
-                            },
-                            child: const Text('Thử lại'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                if (state is! IncomeLoaded) {
-                  return const SizedBox.shrink();
-                }
-
-                final filteredIncomes = state.incomes.where((income) {
-                  return _filter == null || income.type == _filter;
-                }).toList();
-
-                if (filteredIncomes.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'Chưa có giao dịch thu nhập',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface
-                            .withValues(alpha: 0.7),
-                      ),
-                    ),
-                  );
-                }
-
-                final grouped = <String, List<IncomeModel>>{};
-                for (final income in filteredIncomes) {
-                  final key =
-                      '${income.date.day}/${income.date.month}/${income.date.year}';
-                  grouped.putIfAbsent(key, () => []).add(income);
-                }
-
-                final keys = grouped.keys.toList();
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: keys.length,
-                  itemBuilder: (context, index) {
-                    final key = keys[index];
-                    final items = grouped[key]!;
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Text(
-                            key,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        ...items.map(_buildIncomeItem),
-                        const SizedBox(height: 12),
-                      ],
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+            ..._buildBody(context, state),
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildIncomeItem(IncomeModel income) {
-    return Dismissible(
-      key: Key(income.id),
-      direction: DismissDirection.endToStart,
-      confirmDismiss: (_) async {
-        return await showDialog<bool>(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('Xác nhận xoá'),
-                content: const Text('Bạn có chắc muốn xoá khoản thu này không?'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Huỷ'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text('Xoá'),
-                  ),
-                ],
-              ),
-            ) ??
-            false;
-      },
-      onDismissed: (_) => context.read<IncomeBloc>().add(IncomeDeleted(income.id)),
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        decoration: BoxDecoration(
-          color: Colors.red.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(12),
+  List<Widget> _buildBody(BuildContext context, IncomeState state) {
+    if (state is IncomeError) {
+      return [
+        EmptyState(
+          icon: Icons.cloud_off_outlined,
+          title: 'Không tải được thu nhập',
+          message: state.message,
         ),
-        child: const Icon(Icons.delete_outline, color: Colors.red),
-      ),
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 8),
-        child: ListTile(
-          onTap: () => Navigator.pushNamed(
-            context,
-            '/income/edit/${income.id}',
-            arguments: income,
-          ),
-          leading: CircleAvatar(
-            backgroundColor: income.type.color,
-            child: Icon(income.type.icon, color: Colors.white),
-          ),
-          title: Text(income.type.label),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (income.note.isNotEmpty) Text(income.note),
-              Text(
-                '${income.date.hour.toString().padLeft(2, '0')}:${income.date.minute.toString().padLeft(2, '0')}',
-              ),
-            ],
-          ),
-          trailing: Text(
-            formatVnd(income.amount),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
+        Center(
+          child: FilledButton(
+            onPressed: () => context.read<IncomeBloc>().add(
+              IncomeMonthChanged(widget.month, widget.year),
             ),
+            child: const Text('Thử lại'),
           ),
         ),
+      ];
+    }
+
+    if (state is! IncomeLoaded) {
+      return const [
+        Padding(
+          padding: EdgeInsets.all(32),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ];
+    }
+
+    final incomes = state.incomes
+        .where((income) => !_removedIds.contains(income.id))
+        .where((income) => _filter == null || income.type == _filter)
+        .toList();
+
+    if (incomes.isEmpty) {
+      return const [
+        EmptyState(
+          icon: Icons.account_balance_wallet_outlined,
+          title: 'Không có khoản thu nào',
+        ),
+      ];
+    }
+
+    final total = incomes.fold<double>(0, (acc, income) => acc + income.amount);
+    return [
+      AppCard(
+        child: StatColumn(
+          label: '${incomes.length} khoản thu',
+          value: NumberHelper.formatCurrency(total),
+          valueColor: Colors.green.shade600,
+        ),
       ),
-    );
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final (day, items) in groupByDay(
+            incomes,
+            (IncomeModel income) => income.date,
+          )) ...[
+            DayHeader(dayLabel(day)),
+            for (final income in items)
+              Dismissible(
+                key: ValueKey(income.id),
+                direction: DismissDirection.endToStart,
+                background: const SwipeDeleteBackground(),
+                confirmDismiss: (_) => confirmDelete(
+                  context,
+                  'Bạn có chắc muốn xoá khoản thu này?',
+                ),
+                onDismissed: (_) {
+                  setState(() => _removedIds.add(income.id));
+                  context.read<IncomeBloc>().add(IncomeDeleted(income.id));
+                },
+                child: IncomeTile(income: income),
+              ),
+          ],
+        ],
+      ),
+    ];
   }
 }

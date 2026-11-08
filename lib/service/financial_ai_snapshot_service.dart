@@ -377,7 +377,7 @@ class FinancialAiSnapshotService {
     return value
         .toLowerCase()
         .replaceAll(RegExp(r'\s+'), ' ')
-        .replaceAll(RegExp(r'[^0-9a-zÃ -á»¹]+'), ' ')
+        .replaceAll(RegExp(r'[^0-9a-zà-ỹ]+'), ' ')
         .trim();
   }
 
@@ -389,8 +389,8 @@ class FinancialAiSnapshotService {
 
   bool _isCancelled(String status) {
     final normalized = status.toLowerCase();
-    return normalized.contains('huá»·') ||
-        normalized.contains('há»§y') ||
+    return normalized.contains('huỷ') ||
+        normalized.contains('hủy') ||
         normalized.contains('cancel');
   }
 }

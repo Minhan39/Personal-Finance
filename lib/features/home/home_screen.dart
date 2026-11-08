@@ -1,15 +1,17 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:personal_finance/service/fcm_service.dart';
 
-import '../../data/feature_data.dart';
-import '../../service/save_service.dart';
-import '../../shared/widgets/app_drawer.dart';
-import '../../shared/widgets/header.dart';
-import '../../shared/widgets/home_card.dart';
-import '../../shared/widgets/linear_header.dart';
-import '../../shared/widgets/visa_card.dart';
+import '../../service/fcm_service.dart';
+import '../ai_report/financial_ai_report_screen.dart';
+import 'tabs/overview_tab.dart';
+import 'tabs/profile_tab.dart';
+import 'tabs/transactions_tab.dart';
+import 'widgets/quick_add_sheet.dart';
 
+/// Signed-in shell: bottom navigation between the home tabs, with a central
+/// "+" that opens the quick-add sheet instead of a tab.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -18,108 +20,112 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _scaffoldKey = GlobalKey<ScaffoldState>();
-  late Future<List<List<Object?>>?> _dataFuture;
+  static const _overview = 0;
+  static const _transactions = 1;
+  static const _add = 2;
+  static const _report = 3;
+
+  int _index = _overview;
+
+  /// Per-tab reload counters (overview, transactions). A tab reloads when
+  /// its counter changes: on being selected, or after a quick add.
+  final _refreshTicks = [0, 0];
+  StreamSubscription<User?>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
-    FirebaseAuth.instance.authStateChanges().listen((user) async {
-      if (user != null) {
-        final token = await FcmService.getFcmToken();
-        await FcmService.addLog(
-          deviceType: 'android',
-          fcmToken: token ?? '',
-          userId: user.uid,
-        );
-      }
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((
+      user,
+    ) async {
+      if (user == null) return;
+      final token = await FcmService.getFcmToken();
+      await FcmService.addLog(
+        deviceType: 'android',
+        fcmToken: token ?? '',
+        userId: user.uid,
+      );
     });
-    _dataFuture = SaveService.readSheet();
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _onDestinationSelected(int index) async {
+    if (index == _add) {
+      await QuickAddSheet.show(context);
+      if (mounted) {
+        setState(() {
+          _refreshTicks[_overview]++;
+          _refreshTicks[_transactions]++;
+        });
+      }
+      return;
+    }
+    setState(() {
+      _index = index;
+      if (index < _refreshTicks.length) _refreshTicks[index]++;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      key: _scaffoldKey,
-      drawer: const AppDrawer(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.pushNamed(context, '/ai-report'),
-        tooltip: 'Báo cáo tài chính',
-        child: const Icon(Icons.assessment),
+      body: IndexedStack(
+        index: _index > _add ? _index - 1 : _index,
+        children: [
+          OverviewTab(
+            refreshTick: _refreshTicks[_overview],
+            onOpenReport: () => _onDestinationSelected(_report),
+            onOpenTransactions: () => _onDestinationSelected(_transactions),
+          ),
+          TransactionsTab(refreshTick: _refreshTicks[_transactions]),
+          const FinancialAiReportScreen(embedded: true),
+          const ProfileTab(),
+        ],
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      body: FutureBuilder<List<List<Object?>>?>(
-        future: _dataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          }
-
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(child: Text('No data found.'));
-          }
-
-          final rows = snapshot.data!;
-          return Column(
-            children: [
-              LinearHeader(
-                child: SafeArea(
-                  bottom: false,
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Header(
-                          openDrawer: () {
-                            _scaffoldKey.currentState?.openDrawer();
-                          },
-                        ),
-                      ),
-                      Expanded(
-                        child: VisaCard(totalMoney: rows[0][11].toString()),
-                      ),
-                    ],
-                  ),
-                ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _index,
+        onDestinationSelected: _onDestinationSelected,
+        destinations: [
+          const NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Trang chủ',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.swap_vert),
+            label: 'Giao dịch',
+          ),
+          NavigationDestination(
+            icon: Container(
+              width: 48,
+              height: 36,
+              decoration: BoxDecoration(
+                color: scheme.primary,
+                borderRadius: BorderRadius.circular(14),
               ),
-              Expanded(
-                child: SafeArea(
-                  top: false,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
-                    itemCount: homeFeatureData.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      var arguments =
-                          switch (homeFeatureData[index]['navigator']) {
-                            '/save' => rows,
-                            _ => null,
-                          };
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 32),
-                        child: HomeCard(
-                          image: homeFeatureData[index]['image'] ?? '',
-                          title: homeFeatureData[index]['title'] ?? '',
-                          body: homeFeatureData[index]['body'] ?? '',
-                          onPressed: () {
-                            if (homeFeatureData[index]['navigator'] == null ||
-                                homeFeatureData[index]['navigator'] == '/') {
-                              return;
-                            }
-                            Navigator.pushNamed(
-                              context,
-                              homeFeatureData[index]['navigator'] ?? '/',
-                              arguments: arguments,
-                            );
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
+              child: Icon(Icons.add, color: scheme.onPrimary),
+            ),
+            label: 'Thêm',
+            tooltip: 'Thêm giao dịch',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.pie_chart_outline),
+            selectedIcon: Icon(Icons.pie_chart),
+            label: 'Báo cáo',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Tài khoản',
+          ),
+        ],
       ),
     );
   }

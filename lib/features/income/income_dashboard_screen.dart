@@ -1,16 +1,13 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../blocs/income/income_bloc.dart';
 import '../../blocs/income/income_event.dart';
 import '../../blocs/income/income_state.dart';
 import '../../models/income_model.dart';
-import '../../shared/helpers/income_formatter.dart';
-import '../../shared/widgets/linear_header.dart';
-import 'widgets/income_bar_chart.dart';
-import 'widgets/income_pie_chart.dart';
-import 'widgets/income_type_summary_card.dart';
-import 'widgets/month_year_picker.dart';
+import '../../shared/helpers/number_helper.dart';
+import '../../shared/ui/ui.dart';
+import 'widgets/income_tile.dart';
 
 class IncomeDashboardScreen extends StatefulWidget {
   const IncomeDashboardScreen({super.key});
@@ -20,341 +17,277 @@ class IncomeDashboardScreen extends StatefulWidget {
 }
 
 class _IncomeDashboardScreenState extends State<IncomeDashboardScreen> {
+  bool _yearView = false;
+
+  void _changeMonth(int month, int year) {
+    context.read<IncomeBloc>().add(IncomeMonthChanged(month, year));
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.pushNamed(context, '/income/add'),
-        child: const Icon(Icons.add),
-      ),
-      body: BlocConsumer<IncomeBloc, IncomeState>(
-        listener: (context, state) {
-          if (state is IncomeError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        },
-        builder: (context, state) {
-          if (state is IncomeInitial || state is IncomeLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (state is IncomeError) {
-            return _buildErrorState(context, state);
-          }
-
-          if (state is! IncomeLoaded) {
-            return const SizedBox.shrink();
-          }
-
-          final previousTotal = _getPreviousMonthTotal(
-            state.selectedMonth,
-            state.selectedYear,
-            state.monthlyTotals,
-          );
-          final recentIncomes = state.incomes.take(5).toList();
-
-          return Column(
-            children: [
-              LinearHeader(
-                height: 220,
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            IconButton(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.arrow_back),
-                            ),
-                            const Expanded(
-                              child: Padding(
-                                padding: EdgeInsets.only(left: 16),
-                                child: Text(
-                                  'THU NHẬP',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        MonthYearPicker(
-                          month: state.selectedMonth,
-                          year: state.selectedYear,
-                          onPrevious: () {
-                            final previous = DateTime(
-                              state.selectedYear,
-                              state.selectedMonth - 1,
-                            );
-                            context.read<IncomeBloc>().add(
-                              IncomeMonthChanged(previous.month, previous.year),
-                            );
-                          },
-                          onNext: () {
-                            final next = DateTime(
-                              state.selectedYear,
-                              state.selectedMonth + 1,
-                            );
-                            context.read<IncomeBloc>().add(
-                              IncomeMonthChanged(next.month, next.year),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
+    return BlocConsumer<IncomeBloc, IncomeState>(
+      listener: (context, state) {
+        if (state is IncomeError) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.message)));
+        }
+      },
+      builder: (context, state) {
+        final now = DateTime.now();
+        return ModuleScaffold(
+          title: 'Thu nhập',
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () => Navigator.pushNamed(context, '/income/add'),
+            icon: const Icon(Icons.add),
+            label: const Text('Thêm thu nhập'),
+          ),
+          children: [
+            PillRow(
+              children: [
+                PillChip(
+                  label: 'Theo tháng',
+                  selected: !_yearView,
+                  onTap: () => setState(() => _yearView = false),
                 ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildTotalIncomeCard(
-                        context,
-                        state.grandTotal,
-                        previousTotal,
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        height: 132,
-                        child: Row(
-                          children: IncomeType.values.map((type) {
-                            return Expanded(
-                              child: Padding(
-                                padding: EdgeInsets.only(
-                                  right: type == IncomeType.teaching ? 0 : 8,
-                                ),
-                                child: IncomeTypeSummaryCard(
-                                  type: type,
-                                  amount: state.totalByType[type] ?? 0,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      IncomePieChart(data: state.totalByType),
-                      const SizedBox(height: 16),
-                      IncomeBarChart(data: state.monthlyTotals),
-                      const SizedBox(height: 16),
-                      _buildRecentIncomeList(context, recentIncomes, state),
-                      const SizedBox(height: 80)
-                    ],
-                  ),
+                PillChip(
+                  label: 'Theo năm',
+                  selected: _yearView,
+                  onTap: () => setState(() => _yearView = true),
                 ),
+              ],
+            ),
+            if (state is IncomeLoaded) ...[
+              if (_yearView)
+                YearStepper(
+                  year: state.selectedYear,
+                  onChanged: (year) =>
+                      _changeMonth(year == now.year ? now.month : 12, year),
+                )
+              else
+                MonthStrip(
+                  month: state.selectedMonth,
+                  year: state.selectedYear,
+                  onChanged: _changeMonth,
+                ),
+              _buildSummary(context, state),
+              _buildSources(context, state),
+              _yearView
+                  ? _buildMonthsList(context, state)
+                  : _buildTransactions(context, state),
+            ] else if (state is IncomeError)
+              EmptyState(
+                icon: Icons.cloud_off_outlined,
+                title: 'Không tải được thu nhập',
+                message: state.message,
+              )
+            else
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: CircularProgressIndicator()),
               ),
-            ],
-          );
-        },
-      ),
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildErrorState(BuildContext context, IncomeError state) {
-    final now = DateTime.now();
-
-    return SafeArea(
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
-              const SizedBox(height: 16),
-              Text(
-                state.message,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
-                  context.read<IncomeBloc>().add(
-                    IncomeMonthChanged(now.month, now.year),
-                  );
-                },
-                child: const Text('Thử lại'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  List<double> _monthTotals(IncomeLoaded state) {
+    final totals = List<double>.filled(12, 0);
+    for (final income in state.yearIncomes) {
+      if (income.year == state.selectedYear) {
+        totals[income.month - 1] += income.amount;
+      }
+    }
+    return totals;
   }
 
-  Widget _buildTotalIncomeCard(
-    BuildContext context,
-    double grandTotal,
-    double previousTotal,
-  ) {
-    final percentChange = previousTotal <= 0
-        ? null
-        : ((grandTotal - previousTotal) / previousTotal) * 100;
-    final isUp = (percentChange ?? 0) >= 0;
+  Widget _buildSummary(BuildContext context, IncomeLoaded state) {
+    final tone = ModuleTone.of(context, AppModule.income);
+    final totals = _monthTotals(state);
+    final monthsWithData = totals.where((value) => value > 0).length;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Tổng thu nhập tháng',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withValues(
-                alpha: 0.7,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            formatVnd(grandTotal),
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            percentChange == null
-                ? 'Chưa có dữ liệu tháng trước để so sánh'
-                : '${isUp ? 'Tăng' : 'Giảm'} ${percentChange.abs().toStringAsFixed(1)}% so với tháng trước',
-            style: TextStyle(
-              color: percentChange == null
-                  ? Theme.of(context).colorScheme.onSurface.withValues(
-                      alpha: 0.7,
-                    )
-                  : isUp
-                        ? Colors.green
-                        : Colors.red,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+    final String label;
+    final double total;
+    Widget? caption;
 
-  Widget _buildRecentIncomeList(
-    BuildContext context,
-    List<IncomeModel> incomes,
-    IncomeLoaded state,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+    if (_yearView) {
+      label = 'Tổng thu năm ${state.selectedYear}';
+      total = totals.fold(0, (acc, value) => acc + value);
+      if (monthsWithData > 0) {
+        caption = Text(
+          'Trung bình ${NumberHelper.formatCompact(total / monthsWithData)}'
+          '/tháng · $monthsWithData tháng có thu',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Giao dịch gần đây',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pushNamed(
-                  context,
-                  '/income/list',
-                  arguments: {
-                    'month': state.selectedMonth,
-                    'year': state.selectedYear,
-                  },
-                ),
-                child: const Text('Xem tất cả'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (incomes.isEmpty)
-            Text(
-              'Chưa có giao dịch thu nhập trong tháng này',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withValues(
-                  alpha: 0.7,
-                ),
-              ),
-            ),
-          ...incomes.map((income) {
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              onTap: () => Navigator.pushNamed(
-                context,
-                '/income/edit/${income.id}',
-                arguments: income,
-              ),
-              leading: CircleAvatar(
-                backgroundColor: income.type.color,
-                child: Icon(income.type.icon, color: Colors.white),
-              ),
-              title: Text(income.type.label),
-              subtitle: Text(
-                income.note.isEmpty
-                    ? '${income.date.day}/${income.date.month}/${income.date.year}'
-                    : income.note,
-              ),
-              trailing: Text(
-                formatVnd(income.amount),
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  double _getPreviousMonthTotal(
-    int month,
-    int year,
-    List<MonthlyTotal> monthlyTotals,
-  ) {
-    final previousDate = DateTime(year, month - 1);
-
-    for (final monthlyTotal in monthlyTotals) {
-      if (monthlyTotal.month == previousDate.month &&
-          monthlyTotal.year == previousDate.year) {
-        return monthlyTotal.total;
+        );
+      }
+    } else {
+      label = 'Tổng thu tháng ${state.selectedMonth}/${state.selectedYear}';
+      total = state.grandTotal;
+      final previous = state.selectedMonth > 1
+          ? totals[state.selectedMonth - 2]
+          : null;
+      if (total > 0 && previous != null && previous > 0) {
+        final change = (total - previous) / previous * 100;
+        caption = _IncomeTrend(change: change);
       }
     }
 
-    return 0;
+    return SummaryCard(
+      label: label,
+      value: NumberHelper.formatCurrency(total),
+      caption: caption,
+      child: MiniBarChart(
+        values: totals,
+        color: tone.accent,
+        highlightIndex: _yearView ? null : state.selectedMonth - 1,
+        labels: const ['T1', 'T6', 'T12'],
+        onBarTap: (index) {
+          setState(() => _yearView = false);
+          _changeMonth(index + 1, state.selectedYear);
+        },
+      ),
+    );
+  }
+
+  Widget _buildSources(BuildContext context, IncomeLoaded state) {
+    final Map<IncomeType, double> byType;
+    if (_yearView) {
+      byType = state.yearIncomes
+          .where((income) => income.year == state.selectedYear)
+          .toList()
+          .totalByType();
+    } else {
+      byType = state.totalByType;
+    }
+
+    final total = byType.values.fold<double>(0, (acc, value) => acc + value);
+    if (total <= 0) return const SizedBox.shrink();
+
+    final entries = byType.entries.where((e) => e.value > 0).toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader(title: 'Nguồn thu'),
+          const SizedBox(height: 12),
+          SegmentedBar(
+            segments: [for (final e in entries) (e.value, e.key.color)],
+          ),
+          const SizedBox(height: 12),
+          for (final entry in entries)
+            LegendRow(
+              color: entry.key.color,
+              label: entry.key.label,
+              value:
+                  '${NumberHelper.formatCompact(entry.value)} · '
+                  '${(entry.value / total * 100).toStringAsFixed(0)}%',
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransactions(BuildContext context, IncomeLoaded state) {
+    if (state.incomes.isEmpty) {
+      return const EmptyState(
+        icon: Icons.account_balance_wallet_outlined,
+        title: 'Chưa có thu nhập trong tháng này',
+        message: 'Bấm "Thêm thu nhập" để ghi khoản đầu tiên.',
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(
+          title: 'Giao dịch',
+          actionLabel: 'Lọc theo nguồn',
+          onAction: () => Navigator.pushNamed(
+            context,
+            '/income/list',
+            arguments: {
+              'month': state.selectedMonth,
+              'year': state.selectedYear,
+            },
+          ),
+        ),
+        for (final (day, items) in groupByDay(
+          state.incomes,
+          (IncomeModel income) => income.date,
+        )) ...[
+          DayHeader(dayLabel(day)),
+          for (final income in items) IncomeTile(income: income),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildMonthsList(BuildContext context, IncomeLoaded state) {
+    final totals = _monthTotals(state);
+    final tone = ModuleTone.of(context, AppModule.income);
+    final months = [
+      for (var month = 12; month >= 1; month--)
+        if (totals[month - 1] > 0) month,
+    ];
+    if (months.isEmpty) {
+      return const EmptyState(
+        icon: Icons.account_balance_wallet_outlined,
+        title: 'Chưa có thu nhập trong năm này',
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'Theo tháng'),
+        for (final month in months)
+          TransactionTile(
+            icon: Icons.calendar_month_outlined,
+            tone: tone,
+            title: 'Tháng $month/${state.selectedYear}',
+            subtitle:
+                '${state.yearIncomes.where((i) => i.month == month && i.year == state.selectedYear).length} khoản thu',
+            amount: NumberHelper.formatCurrency(totals[month - 1]),
+            positive: true,
+            onTap: () {
+              setState(() => _yearView = false);
+              _changeMonth(month, state.selectedYear);
+            },
+          ),
+      ],
+    );
+  }
+}
+
+class _IncomeTrend extends StatelessWidget {
+  const _IncomeTrend({required this.change});
+
+  final double change;
+
+  @override
+  Widget build(BuildContext context) {
+    final up = change >= 0;
+    final color = up
+        ? Colors.green.shade600
+        : Theme.of(context).colorScheme.error;
+    return Row(
+      children: [
+        Icon(
+          up ? Icons.trending_up : Icons.trending_down,
+          size: 16,
+          color: color,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          '${up ? 'Tăng' : 'Giảm'} ${change.abs().toStringAsFixed(0)}% so với tháng trước',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color),
+        ),
+      ],
+    );
   }
 }

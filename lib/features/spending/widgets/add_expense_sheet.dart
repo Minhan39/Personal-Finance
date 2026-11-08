@@ -90,9 +90,6 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
     final colorScheme = Theme.of(context).colorScheme;
     final category = ExpenseCategory.fromKey(_selectedCategory);
     final suggestions = category.quickSuggestions;
-    final inputBorder = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-    );
 
     return Padding(
       padding: EdgeInsets.only(
@@ -122,10 +119,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                       children: [
                         DropdownButtonFormField<String>(
                           initialValue: _selectedCategory,
-                          decoration: InputDecoration(
-                            labelText: 'Danh mục',
-                            border: inputBorder,
-                          ),
+                          decoration: InputDecoration(labelText: 'Danh mục'),
                           items: ExpenseCategory.values
                               .map(
                                 (category) => DropdownMenuItem(
@@ -143,7 +137,6 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                         TextFormField(
                           decoration: InputDecoration(
                             labelText: 'Số tiền',
-                            border: inputBorder,
                             suffixText: 'VND',
                           ),
                           keyboardType: TextInputType.number,
@@ -166,7 +159,6 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                           decoration: InputDecoration(
                             labelText: 'Mô tả',
                             hintText: 'Nhập chữ hoặc chọn gợi ý nhanh',
-                            border: inputBorder,
                           ),
                           maxLines: 3,
                         ),
@@ -203,7 +195,6 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                           readOnly: true,
                           decoration: InputDecoration(
                             labelText: 'Ngày',
-                            border: inputBorder,
                             suffixIcon: const Icon(Icons.calendar_today),
                           ),
                           onTap: _pickDate,

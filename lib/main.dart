@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:personal_finance/blocs/theme/theme_bloc.dart';
+import 'package:personal_finance/core/theme/app_theme.dart';
 import 'package:personal_finance/features/auth/login_screen.dart';
 import 'package:personal_finance/features/home/home_screen.dart';
 import 'package:personal_finance/service/auth_service.dart';
@@ -33,6 +35,10 @@ void main() async {
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtaW1wbWVnenl0cWF6dG56c3FoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NDI2NTgsImV4cCI6MjA5MjExODY1OH0.X7wnz-9H0trjbCEujZFuAYJDTpUX35RglJDAMiM5oVo',
     ),
   ]);
+
+  // Firebase restores the previous sign-in asynchronously. Waiting for its
+  // first auth event keeps the first data load from seeing only Supabase.
+  await FirebaseAuth.instance.authStateChanges().first;
 
   runApp(
     MultiBlocProvider(
@@ -90,35 +96,13 @@ class MyApp extends StatelessWidget {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
           themeMode: state.mode,
-          theme: ThemeData(
+          theme: AppTheme.build(
+            seed: state.getColorPrimary,
             brightness: Brightness.light,
-            primaryColor: state.getColorPrimary,
-            colorScheme: ColorScheme.light(
-              primary: state.getColorPrimary,
-              secondary: state.getColorSecondary,
-              brightness: Brightness.light,
-            ),
-            iconButtonTheme: IconButtonThemeData(
-              style: ButtonStyle(
-                backgroundColor: WidgetStateProperty.all<Color>(Colors.white),
-                iconColor: WidgetStateProperty.all<Color>(Colors.black),
-              ),
-            ),
           ),
-          darkTheme: ThemeData(
+          darkTheme: AppTheme.build(
+            seed: state.getColorPrimary,
             brightness: Brightness.dark,
-            primaryColor: state.getColorPrimary,
-            colorScheme: ColorScheme.dark(
-              primary: state.getColorPrimary,
-              secondary: state.getColorSecondary,
-              brightness: Brightness.dark,
-            ),
-            iconButtonTheme: IconButtonThemeData(
-              style: ButtonStyle(
-                backgroundColor: WidgetStateProperty.all<Color>(Colors.white),
-                iconColor: WidgetStateProperty.all<Color>(Colors.black),
-              ),
-            ),
           ),
           routes: routes,
           onGenerateRoute: onGenerateRoute,

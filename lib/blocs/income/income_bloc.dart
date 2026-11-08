@@ -152,6 +152,7 @@ class IncomeBloc extends Bloc<IncomeEvent, IncomeState> {
         totalByType: _monthIncomes.totalByType(),
         grandTotal: _monthIncomes.grandTotal(),
         monthlyTotals: _buildMonthlyTotals(),
+        yearIncomes: _yearIncomes,
       ),
     );
   }
