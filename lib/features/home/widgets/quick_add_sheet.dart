@@ -16,10 +16,13 @@ class QuickAddSheet extends StatelessWidget {
     );
     if (choice == null || !context.mounted) return;
 
-    if (choice == 'expense') {
-      await AddExpenseSheet.show(context);
-    } else {
-      await Navigator.pushNamed(context, '/income/add');
+    switch (choice) {
+      case 'expense':
+        await AddExpenseSheet.show(context);
+      case 'task':
+        await Navigator.pushNamed(context, '/tasks/edit');
+      default:
+        await Navigator.pushNamed(context, '/income/add');
     }
   }
 
@@ -33,7 +36,7 @@ class QuickAddSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Thêm giao dịch',
+              'Thêm mới',
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
@@ -53,6 +56,14 @@ class QuickAddSheet extends StatelessWidget {
               title: 'Thu nhập',
               subtitle: 'Ghi lại một khoản tiền vào',
               onTap: () => Navigator.pop(context, 'income'),
+            ),
+            const SizedBox(height: 12),
+            _Option(
+              icon: Icons.task_alt,
+              tone: ModuleTone.of(context, AppModule.tasks),
+              title: 'Công việc',
+              subtitle: 'Việc cần làm, một lần hoặc lặp lại',
+              onTap: () => Navigator.pop(context, 'task'),
             ),
           ],
         ),

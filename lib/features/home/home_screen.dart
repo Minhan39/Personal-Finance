@@ -3,7 +3,11 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../models/task_item.dart';
+import '../../navigator/navigator.dart';
 import '../../service/fcm_service.dart';
+import '../../service/task_notification_service.dart';
+import '../../service/task_service.dart';
 import '../ai_report/financial_ai_report_screen.dart';
 import 'tabs/overview_tab.dart';
 import 'tabs/profile_tab.dart';
@@ -31,6 +35,8 @@ class _HomeScreenState extends State<HomeScreen> {
   /// its counter changes: on being selected, or after a quick add.
   final _refreshTicks = [0, 0];
   StreamSubscription<User?>? _authSubscription;
+  StreamSubscription<List<TaskItem>>? _taskSubscription;
+  StreamSubscription<String>? _reminderTapSubscription;
 
   @override
   void initState() {
@@ -46,11 +52,33 @@ class _HomeScreenState extends State<HomeScreen> {
         userId: user.uid,
       );
     });
+
+    // Keep scheduled reminders in step with the task list.
+    _taskSubscription = TaskService.watch().listen(
+      TaskNotificationService.sync,
+      onError: (Object error) => debugPrint('Task sync stopped: $error'),
+    );
+
+    // Tapping a reminder opens the task list.
+    _reminderTapSubscription = TaskNotificationService.taps.listen(
+      (_) => _openTasks(),
+    );
+    TaskNotificationService.launchPayload().then((payload) {
+      if (payload != null) _openTasks();
+    });
+  }
+
+  void _openTasks() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      appNavigatorKey.currentState?.pushNamed('/tasks');
+    });
   }
 
   @override
   void dispose() {
     _authSubscription?.cancel();
+    _taskSubscription?.cancel();
+    _reminderTapSubscription?.cancel();
     super.dispose();
   }
 
@@ -113,7 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Icon(Icons.add, color: scheme.onPrimary),
             ),
             label: 'Thêm',
-            tooltip: 'Thêm giao dịch',
+            tooltip: 'Thêm mới',
           ),
           const NavigationDestination(
             icon: Icon(Icons.pie_chart_outline),

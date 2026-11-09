@@ -51,6 +51,8 @@ dependencies:
   excel: ^4.0.6
   share_plus: ^11.0.0
   supabase_flutter: ^2.12.4
+  timezone: ^0.10.1
+  flutter_timezone: ^5.1.1
 
 flutter_launcher_icons:
   android: true

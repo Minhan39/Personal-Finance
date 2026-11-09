@@ -9,6 +9,12 @@ import '../features/auth/login_screen.dart';
 import '../features/ai_report/financial_ai_report_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/save/save_screen.dart';
+import '../features/tasks/task_form_screen.dart';
+import '../features/tasks/tasks_screen.dart';
+import '../models/task_item.dart';
+
+/// Lets code outside the widget tree (e.g. notification taps) navigate.
+final appNavigatorKey = GlobalKey<NavigatorState>();
 
 final routes = {
   '/home': (context) => const HomeScreen(),
@@ -18,6 +24,7 @@ final routes = {
   '/spending': (context) => const SpendingScreen(),
   '/income': (context) => const IncomeDashboardScreen(),
   '/income/add': (context) => const IncomeFormScreen(),
+  '/tasks': (context) => const TasksScreen(),
 };
 
 Route<dynamic>? onGenerateRoute(RouteSettings settings) {
@@ -28,6 +35,13 @@ Route<dynamic>? onGenerateRoute(RouteSettings settings) {
 
     return MaterialPageRoute(
       builder: (_) => IncomeListScreen(month: month, year: year),
+      settings: settings,
+    );
+  }
+
+  if (settings.name == '/tasks/edit') {
+    return MaterialPageRoute(
+      builder: (_) => TaskFormScreen(task: settings.arguments as TaskItem?),
       settings: settings,
     );
   }

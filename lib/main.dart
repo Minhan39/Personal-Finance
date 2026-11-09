@@ -12,6 +12,7 @@ import 'package:personal_finance/features/auth/login_screen.dart';
 import 'package:personal_finance/features/home/home_screen.dart';
 import 'package:personal_finance/service/auth_service.dart';
 import 'package:personal_finance/service/income_service.dart';
+import 'package:personal_finance/service/task_notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'blocs/expense/expense_bloc.dart';
@@ -34,6 +35,7 @@ void main() async {
       anonKey:
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtaW1wbWVnenl0cWF6dG56c3FoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NDI2NTgsImV4cCI6MjA5MjExODY1OH0.X7wnz-9H0trjbCEujZFuAYJDTpUX35RglJDAMiM5oVo',
     ),
+    TaskNotificationService.init(),
   ]);
 
   // Firebase restores the previous sign-in asynchronously. Waiting for its
@@ -104,6 +106,7 @@ class MyApp extends StatelessWidget {
             seed: state.getColorPrimary,
             brightness: Brightness.dark,
           ),
+          navigatorKey: appNavigatorKey,
           routes: routes,
           onGenerateRoute: onGenerateRoute,
           home: StreamBuilder<Session?>(

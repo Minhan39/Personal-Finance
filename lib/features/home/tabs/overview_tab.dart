@@ -6,6 +6,7 @@ import '../../../service/month_activity_service.dart';
 import '../../../service/savings_repository.dart';
 import '../../../shared/helpers/number_helper.dart';
 import '../../../shared/ui/ui.dart';
+import '../../tasks/widgets/today_tasks_card.dart';
 import '../widgets/activity_tile.dart';
 
 /// Home tab: total assets, this month's cash flow, shortcuts and the latest
@@ -98,6 +99,7 @@ class _OverviewTabState extends State<OverviewTab> {
               _buildShortcuts(context),
               const SizedBox(height: 20),
               _buildCashFlowCard(context),
+              const TodayTasksCard(),
               const SizedBox(height: 20),
               SectionHeader(
                 title: 'Giao dịch gần đây',
@@ -240,10 +242,15 @@ class _OverviewTabState extends State<OverviewTab> {
                 IconBadge(
                   icon: icon,
                   tone: ModuleTone.of(context, module),
-                  size: 52,
+                  size: 48,
                 ),
                 const SizedBox(height: 8),
-                Text(label, style: Theme.of(context).textTheme.labelMedium),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
               ],
             ),
           ),
@@ -270,6 +277,12 @@ class _OverviewTabState extends State<OverviewTab> {
           AppModule.income,
           'Thu nhập',
           () => _openModule('/income'),
+        ),
+        shortcut(
+          Icons.task_alt,
+          AppModule.tasks,
+          'Công việc',
+          () => _openModule('/tasks'),
         ),
         shortcut(
           Icons.pie_chart_outline,

@@ -5,6 +5,7 @@ import '../../../blocs/theme/theme_bloc.dart';
 import '../../../blocs/theme/theme_event.dart';
 import '../../../blocs/theme/theme_state.dart';
 import '../../../service/auth_service.dart';
+import '../../../service/task_notification_service.dart';
 import '../../../shared/ui/ui.dart';
 import 'overview_tab.dart';
 
@@ -36,7 +37,10 @@ class ProfileTab extends StatelessWidget {
         ],
       ),
     );
-    if (confirmed == true) await AppAuthService.signOut();
+    if (confirmed != true) return;
+    // Reminders belong to this account; don't keep them after sign-out.
+    await TaskNotificationService.cancelAll();
+    await AppAuthService.signOut();
   }
 
   @override

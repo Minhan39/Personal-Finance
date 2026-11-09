@@ -6,7 +6,8 @@ enum AppModule {
   savings(Color(0xFF0F9D77)),
   spending(Color(0xFFD85A30)),
   income(Color(0xFF6C5CE7)),
-  report(Color(0xFFBA7517));
+  report(Color(0xFFBA7517)),
+  tasks(Color(0xFF2F6FDE));
 
   const AppModule(this.seed);
 
